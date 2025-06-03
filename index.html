@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>지진 데이터 시각화 (깊이 정보 추가)</title>
+  <title>지진 데이터 시각화</title>
 
   <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
   <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
@@ -73,7 +73,6 @@
               "size": {"field": "area"}, "fill": {"scale": "color_scale", "field": "magnitude"},
               "stroke": {"scale": "color_scale", "field": "magnitude"}, "strokeWidth": {"value": 1},
               "opacity": {"value": 0.7},
-              // ✨ 깊이 정보 추가 및 format 함수로 소수점 한 자리까지 표시
               "tooltip": {"signal": "'📍 ' + datum.location + '\\n규모: ' + datum.magnitude + ' / ' + datum.date + '\\n깊이: ' + format(datum.depth, '.1f') + ' km'"}
             },
             "update": {"x": {"field": "x"}, "y": {"field": "y"}}
