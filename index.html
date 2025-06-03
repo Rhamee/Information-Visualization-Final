@@ -3,10 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <title>지진 데이터 시각화</title>
-  <!-- Vega 라이브러리 -->
+  <!-- Vega와 Vega-Embed 불러오기 -->
   <script src="https://cdn.jsdelivr.net/npm/vega@6"></script>
   <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
-    <style>
+
+  <style>
     /* 화면 전체를 감싸는 컨테이너: 수평 중앙 정렬 */
     .container {
       display: flex;
@@ -49,55 +50,98 @@
     }
   </style>
 </head>
-<body style="margin:0">
-  <div id="vis"></div>
+<body>
+  <!-- 1) 모든 내용을 감싸는 컨테이너 -->
+  <div class="container">
+    <!-- 2) Vega 시각화가 표시될 영역 -->
+    <div id="vis"></div>
+
+    <!-- 3) 아래에 검색/슬라이더/날짜 입력 등의 컨트롤 -->
+    <div class="controls">
+      <!-- 위치 검색 -->
+      <label for="searchTerm">위치 검색 (예: 일본):</label>
+      <input type="text" id="searchTerm" name="searchTerm" />
+
+      <!-- 최소 규모 슬라이더 -->
+      <label for="minMag">최소 규모:</label>
+      <input type="range" id="minMag" name="minMag" min="0" max="10" step="0.1" value="0" />
+
+      <!-- 최대 규모 슬라이더 -->
+      <label for="maxMag">최대 규모:</label>
+      <input type="range" id="maxMag" name="maxMag" min="0" max="10" step="0.1" value="10" />
+
+      <!-- 시작 날짜 -->
+      <label for="startDate">시작 날짜:</label>
+      <input type="date" id="startDate" name="startDate" />
+
+      <!-- 종료 날짜 -->
+      <label for="endDate">종료 날짜:</label>
+      <input type="date" id="endDate" name="endDate" />
+    </div>
+  </div>
+
   <script>
-    // 여기에 Vega JSON 스펙을 직접 넣거나, 외부 JSON을 불러오도록 작성
+    // Vega 사양(spec)
     const spec = {
       "$schema": "https://vega.github.io/schema/vega/v6.json",
       "width": 900,
       "height": 550,
       "padding": 5,
       "background": "steelblue",
+
       "signals": [
         {
           "name": "searchTerm",
           "value": "",
-          "bind": { "input": "text", "placeholder": "위치 검색 (예: 일본)" }
+          "on": [
+            {
+              "events": { "input": "searchTerm" },
+              "update": "searchTerm"
+            }
+          ]
         },
         {
           "name": "minMag",
           "value": 0,
-          "bind": {
-            "input": "range",
-            "min": 0,
-            "max": 10,
-            "step": 0.1,
-            "name": "최소 규모: "
-          }
+          "on": [
+            {
+              "events": { "input": "minMag" },
+              "update": "minMag"
+            }
+          ]
         },
         {
           "name": "maxMag",
           "value": 10,
-          "bind": {
-            "input": "range",
-            "min": 0,
-            "max": 10,
-            "step": 0.1,
-            "name": "최대 규모: "
-          }
+          "on": [
+            {
+              "events": { "input": "maxMag" },
+              "update": "maxMag"
+            }
+          ]
         },
         {
           "name": "startDate",
           "value": "",
-          "bind": { "input": "date", "name": "시작 날짜: " }
+          "on": [
+            {
+              "events": { "input": "startDate" },
+              "update": "startDate"
+            }
+          ]
         },
         {
           "name": "endDate",
           "value": "",
-          "bind": { "input": "date", "name": "종료 날짜: " }
+          "on": [
+            {
+              "events": { "input": "endDate" },
+              "update": "endDate"
+            }
+          ]
         }
       ],
+
       "projections": [
         {
           "name": "world_projection",
@@ -109,6 +153,7 @@
           ]
         }
       ],
+
       "data": [
         {
           "name": "world",
@@ -142,6 +187,7 @@
           ]
         }
       ],
+
       "marks": [
         {
           "type": "shape",
@@ -172,8 +218,7 @@
               "strokeWidth": { "value": 1 },
               "opacity": { "value": 0.6 },
               "tooltip": {
-                "signal":
-                  "'📍 ' + datum.location + '\\n규모: ' + datum.magnitude + ' / ' + datum.date"
+                "signal": "'📍 ' + datum.location + '\\n규모: ' + datum.magnitude + ' / ' + datum.date"
               }
             }
           }
@@ -181,7 +226,31 @@
       ]
     };
 
-    vegaEmbed('#vis', spec).catch(console.error);
+    // Vega-Embed 옵션: signals를 HTML 컨트롤과 연결하려면, vega-embed 설정을 추가
+    const embedOptions = {
+      // Vega-Embed는 HTML 컨트롤( id="searchTerm" 등 )을 Vega 시그널에 자동 연결해 주지는 않습니다.
+      // 그래서 아래와 같이, Vega View를 얻은 뒤에 HTML 컨트롤 이벤트를 직접 연결해 줍니다.
+      actions: false
+    };
+
+    vegaEmbed('#vis', spec, embedOptions).then(({ view }) => {
+      // HTML 컨트롤의 변화 → Vega 시그널 업데이트
+      document.getElementById('searchTerm').addEventListener('input', function() {
+        view.signal('searchTerm', this.value).runAsync();
+      });
+      document.getElementById('minMag').addEventListener('input', function() {
+        view.signal('minMag', +this.value).runAsync();
+      });
+      document.getElementById('maxMag').addEventListener('input', function() {
+        view.signal('maxMag', +this.value).runAsync();
+      });
+      document.getElementById('startDate').addEventListener('input', function() {
+        view.signal('startDate', this.value).runAsync();
+      });
+      document.getElementById('endDate').addEventListener('input', function() {
+        view.signal('endDate', this.value).runAsync();
+      });
+    });
   </script>
 </body>
 </html>
