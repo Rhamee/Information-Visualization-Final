@@ -6,6 +6,48 @@
   <!-- Vega 라이브러리 -->
   <script src="https://cdn.jsdelivr.net/npm/vega@6"></script>
   <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+    <style>
+    /* 화면 전체를 감싸는 컨테이너: 수평 중앙 정렬 */
+    .container {
+      display: flex;
+      flex-direction: column; /* 세로로 쌓기 */
+      align-items: center;    /* 가로 방향 가운데 정렬 */
+      /* 높이가 충분히 있으면, 세로로도 가운데 정렬하고 싶다면 다음 두 줄을 추가하세요:
+      justify-content: center;
+      height: 100vh;
+      */
+    }
+
+    /* Vega 차트(#vis) 자체를 가운데 정렬하고, 상하 여백을 약간 줍니다. */
+    #vis {
+      margin: 20px auto;    /* 위아래 20px, 좌우 자동 여백(가운데) */
+      /* 필요하다면 너비를 고정하거나 반응형으로 만들 수 있습니다. */
+      max-width: 900px;
+      width: 100%;
+      /* 높이도 필요하다면 지정 */
+      height: 550px;
+    }
+
+    /* 컨트롤 영역(검색창, 슬라이더 등)을 세로로 정렬하면서, 부드러운 레이아웃을 위해 약간의 패딩 추가 */
+    .controls {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;  /* 레이블+입력은 왼쪽 정렬해도 무방 */
+      margin-bottom: 30px;
+      gap: 8px; /* 컨트롤 간 간격 */
+      width: 900px; /* Vega 차트와 같은 너비를 주면 정렬감이 더 좋아집니다 */
+      max-width: 100%;
+    }
+
+    .controls label {
+      font-size: 14px;
+      margin-right: 8px;
+    }
+
+    .controls input[type="text"] {
+      width: 200px;
+    }
+  </style>
 </head>
 <body style="margin:0">
   <div id="vis"></div>
