@@ -2,81 +2,43 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>지진 지도 (지도+지진점 함께 줌/팬)</title>
+  <title>지진 데이터 시각화 (마우스 확대/이동)</title>
 
-  <!-- Vega + Vega-Embed 불러오기 -->
-  <script src="https://cdn.jsdelivr.net/npm/vega@6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
   <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
 
   <style>
     html, body {
-      margin: 0;
-      padding: 0;
-      background: #eef2f5;
-      display: flex;
-      justify-content: center; /* 화면 중앙 정렬(가로) */
-      align-items: center;     /* 화면 중앙 정렬(세로) */
-      height: 100vh;
+      margin: 0; padding: 0; background-color: #eef2f5; display: flex;
+      flex-direction: column; align-items: center;
     }
     .wrapper {
-      width: 900px;           /* 지도의 고정 너비 */
-      margin: auto;
-      display: flex;
-      flex-direction: column;
-      align-items: stretch;
-      gap: 16px;
+      width: 900px; margin: 20px auto; display: flex; flex-direction: column;
+      align-items: stretch; gap: 0;
     }
     #vis {
-      width: 100%;            /* 래퍼 너비에 딱 맞춤 */
-      height: 550px;
-      background: white;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      width: 100%; height: 550px; background: white;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2); cursor: grab;
     }
+    #vis:active { cursor: grabbing; }
     .controls {
-      width: 100%;
-      background: white;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      padding: 12px 16px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      border-radius: 4px;
+      width: 100%; background: white; display: flex; flex-wrap: wrap; gap: 12px;
+      padding: 12px 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      border-radius: 4px; margin-top: 16px;
     }
-    .controls > div {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .controls label {
-      font-size: 14px;
-      white-space: nowrap;
-    }
-    .controls input[type="text"] {
-      width: 180px;
-      padding: 4px 6px;
-      font-size: 14px;
-    }
-    .controls input[type="range"] {
-      width: 150px;
-    }
-    .controls input[type="date"] {
-      padding: 4px;
-      font-size: 14px;
-    }
-    .controls span {
-      font-size: 14px;
-      min-width: 24px;
-      text-align: center;
-    }
+    .controls > div { display: flex; align-items: center; gap: 6px; }
+    .controls label { font-size: 14px; white-space: nowrap; }
+    .controls input[type="text"] { width: 180px; padding: 4px 6px; font-size: 14px; }
+    .controls input[type="range"] { width: 150px; }
+    .controls input[type="date"] { padding: 4px; font-size: 14px; }
+    .controls span { font-size: 14px; min-width: 24px; text-align: center; }
   </style>
 </head>
 
 <body>
   <div class="wrapper">
-    <!-- Vega 차트 영역 -->
     <div id="vis"></div>
-
-    <!-- 검색/필터 컨트롤 박스 -->
     <div class="controls">
       <div>
         <label for="searchTerm">위치 검색</label>
@@ -104,243 +66,105 @@
   </div>
 
   <script>
-    // =========================================================
-    // Vega 사양: 지도 + 지진점 모두 dynamic_proj(줌/팬 반영)
-    // =========================================================
     const spec = {
-      "$schema": "https://vega.github.io/schema/vega/v6.json",
-
-      "width": 900,
-      "height": 550,
-      "padding": 0,
-      "background": "steelblue",
+      "$schema": "https://vega.github.io/schema/vega/v5.json",
+      "width": 900, "height": 550, "padding": 5, "background": "steelblue",
 
       "signals": [
-        // (A) 검색/필터 시그널
+        { "name": "searchTerm", "value": "", "on": [{"events": "input#searchTerm", "update": "event.target.value"}] },
+        {"name": "minMag", "value": 0, "bind": {"input": "range", "element": "#minMag", "min": 0, "max": 10, "step": 0.1}},
+        {"name": "maxMag", "value": 10, "bind": {"input": "range", "element": "#maxMag", "min": 0, "max": 10, "step": 0.1}},
+        {"name": "startDate", "value": "", "on": [{"events": "input#startDate", "update": "event.target.value"}]},
+        {"name": "endDate", "value": "", "on": [{"events": "input#endDate", "update": "event.target.value"}]},
         {
-          "name": "searchTerm",
-          "value": "",
-          "on": [
-            {
-              "events": { "source": "view", "type": "signal", "signal": "searchTerm" },
-              "update": "searchTerm"
-            }
-          ]
+          "name": "centerPoint", "value": [0, 0],
+          "on": [{
+            "events": "[mousedown, window:mouseup] > window:mousemove!",
+            "update": "[drag_center[0] + (anchor_geo[0] - invert('world_projection', xy())[0]), drag_center[1] + (anchor_geo[1] - invert('world_projection', xy())[1])]"
+          }]
         },
+        {"name": "anchor_geo", "value": [0, 0], "on": [{"events": "mousedown", "update": "invert('world_projection', xy())"}]},
+        {"name": "drag_center", "value": [0, 0], "on": [{"events": "mousedown", "update": "centerPoint"}]},
         {
-          "name": "minMag",
-          "value": 0,
-          "on": [
-            {
-              "events": { "source": "view", "type": "signal", "signal": "minMag" },
-              "update": "minMag"
-            }
-          ]
-        },
-        {
-          "name": "maxMag",
-          "value": 10,
-          "on": [
-            {
-              "events": { "source": "view", "type": "signal", "signal": "maxMag" },
-              "update": "maxMag"
-            }
-          ]
-        },
-        {
-          "name": "startDate",
-          "value": "",
-          "on": [
-            {
-              "events": { "source": "view", "type": "signal", "signal": "startDate" },
-              "update": "startDate"
-            }
-          ]
-        },
-        {
-          "name": "endDate",
-          "value": "",
-          "on": [
-            {
-              "events": { "source": "view", "type": "signal", "signal": "endDate" },
-              "update": "endDate"
-            }
-          ]
-        },
-
-        // (B) 지도+지진점 줌/팬 시그널
-        {
-          "name": "zoom",
-          "value": 180,
-          "on": [
-            {
-              "events": "window:wheel!",
-              "update": "clamp(zoom * pow(1.001, -event.deltaY), 50, 1200)"
-            }
-          ]
-        },
-        {
-          "name": "tx",
-          "value": 450,
-          "on": [
-            {
-              "events": "window:drag[!event.shiftKey]",
-              "update": "tx + event.dx"
-            }
-          ]
-        },
-        {
-          "name": "ty",
-          "value": 275,
-          "on": [
-            {
-              "events": "window:drag[!event.shiftKey]",
-              "update": "ty + event.dy"
-            }
-          ]
+          "name": "scale", "value": 180,
+          "on": [{
+            "events": "wheel!",
+            "update": "clamp(scale * pow(1.0005, -event.deltaY), 180, 8000)"
+          }]
         }
       ],
 
-      // ======================================================
-      // 프로젝션: zoom, tx, ty 시그널 바인딩 → 동적 계산
-      // ======================================================
       "projections": [
         {
-          "name": "dynamic_proj",
+          "name": "world_projection",
           "type": "equalEarth",
-          "scale": { "signal": "zoom" },
-          "translate": [
-            { "signal": "tx" },
-            { "signal": "ty" }
-          ]
+          "scale": {"signal": "scale"},
+          "rotate": {"signal": "[-(centerPoint[0] || 0), -(centerPoint[1] || 0), 0]"},
+          "translate": [{"signal": "width / 2"}, {"signal": "height / 2"}]
         }
       ],
 
-      // ======================================================
-      // 데이터: 세계 지도 + 지진 정보
-      // ======================================================
       "data": [
-        // (1) 세계 지도 (TopoJSON)
-        {
-          "name": "world",
-          "url": "https://vega.github.io/vega/data/world-110m.json",
-          "format": { "type": "topojson", "feature": "countries" }
-        },
-        // (2) 지진 데이터(JSON) → 필터 → geopoint(dynamic_proj) → 면적 계산
+        { "name": "world", "url": "https://vega.github.io/vega/data/world-110m.json", "format": { "type": "topojson", "feature": "countries" }},
         {
           "name": "earthquakes",
           "url": "https://raw.githubusercontent.com/Rhamee/Information-Visualization-Final/main/earthquake_data.json",
           "format": { "type": "json" },
           "transform": [
-            // (A) 위치 검색 / 규모 / 날짜 필터
             {
               "type": "filter",
-              "expr":
-                "(searchTerm == '' || indexof(lower(datum.location), lower(searchTerm)) >= 0)" +
-                " && (datum.magnitude >= minMag && datum.magnitude <= maxMag)" +
-                " && (startDate == '' || datum.date >= startDate)" +
-                " && (endDate == '' || datum.date <= endDate)"
+              "expr": "(searchTerm == '' || indexof(lower(datum.location), lower(searchTerm)) >= 0) && (datum.magnitude >= minMag && datum.magnitude <= maxMag) && (startDate == '' || datum.date >= startDate) && (endDate == '' || datum.date <= endDate)"
             },
-            // (B) dynamic_proj을 이용해 매번 x,y 계산 → 줌/팬 반영
+            // ✨ geopoint를 다시 사용하되, signal 속성을 추가하여 동적으로 만듭니다.
             {
               "type": "geopoint",
-              "projection": "dynamic_proj",
+              "projection": "world_projection",
               "fields": ["longitude", "latitude"],
-              "as": ["x", "y"]
+              "as": ["x", "y"],
+              "signal": "centerPoint + scale" // Pan 또는 Zoom 시 이 transform을 다시 실행시키는 트리거
             },
-            // (C) 규모 → 원 면적(area) 계산
-            {
-              "type": "formula",
-              "expr": "pow(datum.magnitude, 4) / 3",
-              "as": "area"
-            }
+            { "type": "formula", "expr": "pow(datum.magnitude, 3.5)", "as": "area" }
           ]
         }
       ],
 
-      // ======================================================
-      // 마크: 세계 지도(shape) + 지진점(symbol)
-      // 모두 dynamic_proj을 사용
-      // ======================================================
       "marks": [
-        // (1) 세계 지도
         {
           "type": "shape",
           "from": { "data": "world" },
-          "encode": {
-            "enter": {
-              "fill":   { "value": "seagreen" },
-              "stroke": { "value": "#666" }
-            }
-          },
-          "transform": [
-            { "type": "geoshape", "projection": "dynamic_proj" }
-          ]
+          "encode": { "enter": { "fill": { "value": "seagreen" }, "stroke": { "value": "#666" } } },
+          "transform": [{ "type": "geoshape", "projection": "world_projection" }]
         },
-        // (2) 지진점
         {
           "type": "symbol",
           "from": { "data": "earthquakes" },
+          // ✨ x, y 좌표를 update 세트에서 참조하도록 수정합니다.
           "encode": {
             "enter": {
-              "x": { "field": "x" },      // dynamic_proj에서 계산된 x
-              "y": { "field": "y" },      // dynamic_proj에서 계산된 y
               "size": { "field": "area" },
               "fill": { "value": "orange" },
               "stroke": { "value": "orange" },
               "strokeWidth": { "value": 1 },
               "opacity": { "value": 0.6 },
-              "tooltip": {
-                "signal": "'📍 ' + datum.location + '\\n규모: ' + datum.magnitude + ' / ' + datum.date"
-              }
+              "tooltip": { "signal": "'📍 ' + datum.location + '\\n규모: ' + datum.magnitude + ' / ' + datum.date" }
+            },
+            "update": {
+              "x": { "field": "x" },
+              "y": { "field": "y" }
             }
           }
         }
       ]
     };
 
-    // =========================================================
-    // Vega-Embed: #vis에 spec을 렌더링 (actions:false 로 버튼 숨김)
-    // =========================================================
     vegaEmbed('#vis', spec, { actions: false }).then(({ view }) => {
-      // -------------------------------------------------------
-      // (A) HTML 컨트롤 → Vega 시그널 연결
-      // -------------------------------------------------------
-      const searchEl    = document.getElementById('searchTerm');
-      const minMagEl    = document.getElementById('minMag');
-      const maxMagEl    = document.getElementById('maxMag');
-      const startDateEl = document.getElementById('startDate');
-      const endDateEl   = document.getElementById('endDate');
-      const minValSpan  = document.getElementById('minMagValue');
-      const maxValSpan  = document.getElementById('maxMagValue');
-
-      // 위치 검색
-      searchEl.addEventListener('input', () => {
-        view.signal('searchTerm', searchEl.value).runAsync();
-      });
-      // 최소 규모
-      minMagEl.addEventListener('input', () => {
-        minValSpan.textContent = minMagEl.value;
-        view.signal('minMag', +minMagEl.value).runAsync();
-      });
-      // 최대 규모
-      maxMagEl.addEventListener('input', () => {
-        maxValSpan.textContent = maxMagEl.value;
-        view.signal('maxMag', +maxMagEl.value).runAsync();
-      });
-      // 시작 날짜
-      startDateEl.addEventListener('input', () => {
-        view.signal('startDate', startDateEl.value).runAsync();
-      });
-      // 종료 날짜
-      endDateEl.addEventListener('input', () => {
-        view.signal('endDate', endDateEl.value).runAsync();
-      });
-
-      // -------------------------------------------------------
-      // (B) 줌/팬: Vega 내부 프로젝션에서 이미 window 이벤트로 바인딩함.
-      // -------------------------------------------------------
-    }).catch(console.error);
+      const minMagEl = document.getElementById('minMag');
+      const maxMagEl = document.getElementById('maxMag');
+      const minValSpan = document.getElementById('minMagValue');
+      const maxValSpan = document.getElementById('maxMagValue');
+      minMagEl.addEventListener('input', () => minValSpan.textContent = minMagEl.value);
+      maxMagEl.addEventListener('input', () => maxValSpan.textContent = maxMagEl.value);
+    });
   </script>
 </body>
 </html>
