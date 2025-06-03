@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>지진 데이터 시각화 (초기값 수정)</title>
+  <title>지진 데이터 시각화 (최소 범위 수정)</title>
 
   <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
   <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
@@ -59,7 +59,7 @@
       <div><label for="searchTerm">위치 검색</label><input type="text" id="searchTerm" placeholder="예: 일본" /></div>
       <div>
         <label for="minMag">최소 규모</label>
-        <input type="range" id="minMag" min="0" max="10" step="0.1" value="4" />
+        <input type="range" id="minMag" min="4" max="10" step="0.1" value="4" />
         <span id="minMagValue">4</span>
       </div>
       <div><label for="maxMag">최대 규모</label><input type="range" id="maxMag" min="0" max="10" step="0.1" value="10" /><span id="maxMagValue">10</span></div>
@@ -76,7 +76,6 @@
       "width": 720, "height": 550, "padding": 5, "background": "steelblue",
       "signals": [
         {"name": "searchTerm", "value": ""}, 
-        // ✨ 2. Vega Signal 초기값 수정
         { "name": "minMag", "value": 4 }, 
         { "name": "maxMag", "value": 10 }, 
         { "name": "startDate", "value": "" },
@@ -144,7 +143,6 @@
       
       clearButtonEl.addEventListener('click', () => {
         searchInputEl.value = '';
-        // ✨ 3. '초기화' 버튼 로직 수정
         minMagEl.value = 4; 
         maxMagEl.value = 10;
         startDateEl.value = ''; 
