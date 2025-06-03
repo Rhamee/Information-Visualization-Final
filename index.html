@@ -2,100 +2,122 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>지진 데이터 시각화</title>
-  <!-- Vega와 Vega-Embed 불러오기 -->
+  <title>지진 데이터 시각화 (가운데 정렬)</title>
+
+  <!-- Vega 라이브러리 -->
   <script src="https://cdn.jsdelivr.net/npm/vega@6"></script>
   <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
 
   <style>
-    /* 화면 전체를 감싸는 컨테이너: 수평 중앙 정렬 */
-    .container {
+    /* 1) 브라우저 화면 전체를 Flex 컨테이너로 설정 */
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100vh;          /* 뷰포트 전체 높이를 100%로 */
       display: flex;
-      flex-direction: column; /* 세로로 쌓기 */
-      align-items: center;    /* 가로 방향 가운데 정렬 */
-      /* 높이가 충분히 있으면, 세로로도 가운데 정렬하고 싶다면 다음 두 줄을 추가하세요:
-      justify-content: center;
-      height: 100vh;
-      */
+      flex-direction: column; /* 위에서 아래로 쌓기 */
+      align-items: center;    /* 가로 축(수평) 가운데 정렬 */
+      justify-content: center; /* 세로 축에서도 가운데 정렬(필요 시) */
+      background-color: #eef2f5;
     }
 
-    /* Vega 차트(#vis) 자체를 가운데 정렬하고, 상하 여백을 약간 줍니다. */
+    /* 2) Vega 차트(#vis)를 감싸는 컨테이너에 고정 너비와 자동 여백 지정 */
     #vis {
-      margin: 20px auto;    /* 위아래 20px, 좌우 자동 여백(가운데) */
-      /* 필요하다면 너비를 고정하거나 반응형으로 만들 수 있습니다. */
-      max-width: 900px;
-      width: 100%;
-      /* 높이도 필요하다면 지정 */
+      width: 900px;
       height: 550px;
+      margin: 0 auto;      /* 좌우 자동 여백 → 수평 중앙 정렬 */
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      background: white;   /* 약간의 테두리 대비를 위해 배경색 지정 */
     }
 
-    /* 컨트롤 영역(검색창, 슬라이더 등)을 세로로 정렬하면서, 부드러운 레이아웃을 위해 약간의 패딩 추가 */
+    /* 3) 입력 컨트롤(controls) 전체를 가로 너비 900px로 맞추고, 중앙 정렬 */
     .controls {
+      width: 900px;
+      margin: 20px auto;   /* 위아래 20px, 좌우 중앙 정렬 */
       display: flex;
-      flex-direction: column;
-      align-items: flex-start;  /* 레이블+입력은 왼쪽 정렬해도 무방 */
-      margin-bottom: 30px;
-      gap: 8px; /* 컨트롤 간 간격 */
-      width: 900px; /* Vega 차트와 같은 너비를 주면 정렬감이 더 좋아집니다 */
-      max-width: 100%;
+      flex-wrap: wrap;     /* 줄 바꿈 허용 */
+      gap: 12px;           /* 아이템 간 간격 */
+      background: white;
+      padding: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      border-radius: 4px;
+    }
+
+    .controls > * {
+      flex-shrink: 0;      /* 내용 크기가 지정한 만큼 유지 */
     }
 
     .controls label {
       font-size: 14px;
-      margin-right: 8px;
+      margin-right: 6px;
+      white-space: nowrap; /* 레이블이 줄 바뀌지 않도록 */
     }
 
     .controls input[type="text"] {
-      width: 200px;
+      width: 180px;
+      padding: 4px 6px;
+      font-size: 14px;
+    }
+
+    .controls input[type="range"] {
+      width: 150px;
+    }
+
+    .controls input[type="date"] {
+      padding: 4px;
     }
   </style>
 </head>
+
 <body>
-  <!-- 1) 모든 내용을 감싸는 컨테이너 -->
-  <div class="container">
-    <!-- 2) Vega 시각화가 표시될 영역 -->
-    <div id="vis"></div>
+  <!-- Vega 차트를 렌더링할 영역 -->
+  <div id="vis"></div>
 
-    <!-- 3) 아래에 검색/슬라이더/날짜 입력 등의 컨트롤 -->
-    <div class="controls">
-      <!-- 위치 검색 -->
-      <label for="searchTerm">위치 검색 (예: 일본):</label>
-      <input type="text" id="searchTerm" name="searchTerm" />
+  <!-- 검색창, 슬라이더, 날짜 입력 등을 모아놓은 컨트롤 박스 -->
+  <div class="controls">
+    <div>
+      <label for="searchTerm">위치 검색</label>
+      <input type="text" id="searchTerm" placeholder="예: 일본" />
+    </div>
 
-      <!-- 최소 규모 슬라이더 -->
-      <label for="minMag">최소 규모:</label>
-      <input type="range" id="minMag" name="minMag" min="0" max="10" step="0.1" value="0" />
+    <div>
+      <label for="minMag">최소 규모</label>
+      <input type="range" id="minMag" min="0" max="10" step="0.1" value="0" />
+      <span id="minMagValue">0</span>
+    </div>
 
-      <!-- 최대 규모 슬라이더 -->
-      <label for="maxMag">최대 규모:</label>
-      <input type="range" id="maxMag" name="maxMag" min="0" max="10" step="0.1" value="10" />
+    <div>
+      <label for="maxMag">최대 규모</label>
+      <input type="range" id="maxMag" min="0" max="10" step="0.1" value="10" />
+      <span id="maxMagValue">10</span>
+    </div>
 
-      <!-- 시작 날짜 -->
-      <label for="startDate">시작 날짜:</label>
-      <input type="date" id="startDate" name="startDate" />
+    <div>
+      <label for="startDate">시작 날짜</label>
+      <input type="date" id="startDate" />
+    </div>
 
-      <!-- 종료 날짜 -->
-      <label for="endDate">종료 날짜:</label>
-      <input type="date" id="endDate" name="endDate" />
+    <div>
+      <label for="endDate">종료 날짜</label>
+      <input type="date" id="endDate" />
     </div>
   </div>
 
   <script>
-    // Vega 사양(spec)
+    // 1) Vega 스펙 정의
     const spec = {
       "$schema": "https://vega.github.io/schema/vega/v6.json",
       "width": 900,
       "height": 550,
       "padding": 5,
       "background": "steelblue",
-
       "signals": [
         {
           "name": "searchTerm",
           "value": "",
           "on": [
             {
-              "events": { "input": "searchTerm" },
+              "events": { "source": "view", "type": "signal", "signal": "searchTerm" },
               "update": "searchTerm"
             }
           ]
@@ -105,7 +127,7 @@
           "value": 0,
           "on": [
             {
-              "events": { "input": "minMag" },
+              "events": { "source": "view", "type": "signal", "signal": "minMag" },
               "update": "minMag"
             }
           ]
@@ -115,7 +137,7 @@
           "value": 10,
           "on": [
             {
-              "events": { "input": "maxMag" },
+              "events": { "source": "view", "type": "signal", "signal": "maxMag" },
               "update": "maxMag"
             }
           ]
@@ -125,7 +147,7 @@
           "value": "",
           "on": [
             {
-              "events": { "input": "startDate" },
+              "events": { "source": "view", "type": "signal", "signal": "startDate" },
               "update": "startDate"
             }
           ]
@@ -135,13 +157,12 @@
           "value": "",
           "on": [
             {
-              "events": { "input": "endDate" },
+              "events": { "source": "view", "type": "signal", "signal": "endDate" },
               "update": "endDate"
             }
           ]
         }
       ],
-
       "projections": [
         {
           "name": "world_projection",
@@ -153,7 +174,6 @@
           ]
         }
       ],
-
       "data": [
         {
           "name": "world",
@@ -187,7 +207,6 @@
           ]
         }
       ],
-
       "marks": [
         {
           "type": "shape",
@@ -218,7 +237,8 @@
               "strokeWidth": { "value": 1 },
               "opacity": { "value": 0.6 },
               "tooltip": {
-                "signal": "'📍 ' + datum.location + '\\n규모: ' + datum.magnitude + ' / ' + datum.date"
+                "signal":
+                  "'📍 ' + datum.location + '\\n규모: ' + datum.magnitude + ' / ' + datum.date"
               }
             }
           }
@@ -226,29 +246,42 @@
       ]
     };
 
-    // Vega-Embed 옵션: signals를 HTML 컨트롤과 연결하려면, vega-embed 설정을 추가
-    const embedOptions = {
-      // Vega-Embed는 HTML 컨트롤( id="searchTerm" 등 )을 Vega 시그널에 자동 연결해 주지는 않습니다.
-      // 그래서 아래와 같이, Vega View를 얻은 뒤에 HTML 컨트롤 이벤트를 직접 연결해 줍니다.
-      actions: false
-    };
+    // 2) Vega-Embed (actions: false로 “export” 버튼 등을 숨김)
+    vegaEmbed('#vis', spec, { actions: false }).then(({ view }) => {
+      // 3) HTML 컨트롤을 Vega 시그널에 연결
+      const searchEl   = document.getElementById('searchTerm');
+      const minMagEl   = document.getElementById('minMag');
+      const maxMagEl   = document.getElementById('maxMag');
+      const startDateEl= document.getElementById('startDate');
+      const endDateEl  = document.getElementById('endDate');
+      const minValSpan = document.getElementById('minMagValue');
+      const maxValSpan = document.getElementById('maxMagValue');
 
-    vegaEmbed('#vis', spec, embedOptions).then(({ view }) => {
-      // HTML 컨트롤의 변화 → Vega 시그널 업데이트
-      document.getElementById('searchTerm').addEventListener('input', function() {
-        view.signal('searchTerm', this.value).runAsync();
+      // 위치 검색 (텍스트 입력)
+      searchEl.addEventListener('input', () => {
+        view.signal('searchTerm', searchEl.value).runAsync();
       });
-      document.getElementById('minMag').addEventListener('input', function() {
-        view.signal('minMag', +this.value).runAsync();
+
+      // 최소 규모 슬라이더
+      minMagEl.addEventListener('input', () => {
+        minValSpan.textContent = minMagEl.value;
+        view.signal('minMag', +minMagEl.value).runAsync();
       });
-      document.getElementById('maxMag').addEventListener('input', function() {
-        view.signal('maxMag', +this.value).runAsync();
+
+      // 최대 규모 슬라이더
+      maxMagEl.addEventListener('input', () => {
+        maxValSpan.textContent = maxMagEl.value;
+        view.signal('maxMag', +maxMagEl.value).runAsync();
       });
-      document.getElementById('startDate').addEventListener('input', function() {
-        view.signal('startDate', this.value).runAsync();
+
+      // 시작 날짜 입력
+      startDateEl.addEventListener('input', () => {
+        view.signal('startDate', startDateEl.value).runAsync();
       });
-      document.getElementById('endDate').addEventListener('input', function() {
-        view.signal('endDate', this.value).runAsync();
+
+      // 종료 날짜 입력
+      endDateEl.addEventListener('input', () => {
+        view.signal('endDate', endDateEl.value).runAsync();
       });
     });
   </script>
