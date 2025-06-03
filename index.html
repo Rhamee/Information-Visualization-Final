@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>지진 데이터 시각화</title>
+  <!-- Vega 라이브러리 -->
+  <script src="https://cdn.jsdelivr.net/npm/vega@6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+</head>
+<body style="margin:0">
+  <div id="vis"></div>
+  <script>
+    // 여기에 Vega JSON 스펙을 직접 넣거나, 외부 JSON을 불러오도록 작성
+    const spec = {
+      "$schema": "https://vega.github.io/schema/vega/v6.json",
+      "width": 900,
+      "height": 550,
+      "padding": 5,
+      "background": "steelblue",
+      "signals": [
+        {
+          "name": "searchTerm",
+          "value": "",
+          "bind": { "input": "text", "placeholder": "위치 검색 (예: 일본)" }
+        },
+        {
+          "name": "minMag",
+          "value": 0,
+          "bind": {
+            "input": "range",
+            "min": 0,
+            "max": 10,
+            "step": 0.1,
+            "name": "최소 규모: "
+          }
+        },
+        {
+          "name": "maxMag",
+          "value": 10,
+          "bind": {
+            "input": "range",
+            "min": 0,
+            "max": 10,
+            "step": 0.1,
+            "name": "최대 규모: "
+          }
+        },
+        {
+          "name": "startDate",
+          "value": "",
+          "bind": { "input": "date", "name": "시작 날짜: " }
+        },
+        {
+          "name": "endDate",
+          "value": "",
+          "bind": { "input": "date", "name": "종료 날짜: " }
+        }
+      ],
+      "projections": [
+        {
+          "name": "world_projection",
+          "type": "equalEarth",
+          "scale": 180,
+          "translate": [
+            { "signal": "width / 2" },
+            { "signal": "height / 2" }
+          ]
+        }
+      ],
+      "data": [
+        {
+          "name": "world",
+          "url": "https://vega.github.io/vega/data/world-110m.json",
+          "format": { "type": "topojson", "feature": "countries" }
+        },
+        {
+          "name": "earthquakes",
+          "url": "https://raw.githubusercontent.com/Rhamee/Information-Visualization-Final/main/earthquake_data.json",
+          "format": { "type": "json" },
+          "transform": [
+            {
+              "type": "filter",
+              "expr":
+                "(searchTerm == '' || indexof(lower(datum.location), lower(searchTerm)) >= 0)" +
+                " && (datum.magnitude >= minMag && datum.magnitude <= maxMag)" +
+                " && (startDate == '' || datum.date >= startDate)" +
+                " && (endDate == '' || datum.date <= endDate)"
+            },
+            {
+              "type": "geopoint",
+              "projection": "world_projection",
+              "fields": ["longitude", "latitude"],
+              "as": ["x", "y"]
+            },
+            {
+              "type": "formula",
+              "expr": "pow(datum.magnitude, 3.5)",
+              "as": "area"
+            }
+          ]
+        }
+      ],
+      "marks": [
+        {
+          "type": "shape",
+          "from": { "data": "world" },
+          "encode": {
+            "enter": {
+              "fill": { "value": "seagreen" },
+              "stroke": { "value": "#666" }
+            }
+          },
+          "transform": [
+            {
+              "type": "geoshape",
+              "projection": "world_projection"
+            }
+          ]
+        },
+        {
+          "type": "symbol",
+          "from": { "data": "earthquakes" },
+          "encode": {
+            "enter": {
+              "x": { "field": "x" },
+              "y": { "field": "y" },
+              "size": { "field": "area" },
+              "fill": { "value": "orange" },
+              "stroke": { "value": "orange" },
+              "strokeWidth": { "value": 1 },
+              "opacity": { "value": 0.6 },
+              "tooltip": {
+                "signal":
+                  "'📍 ' + datum.location + '\\n규모: ' + datum.magnitude + ' / ' + datum.date"
+              }
+            }
+          }
+        }
+      ]
+    };
+
+    vegaEmbed('#vis', spec).catch(console.error);
+  </script>
+</body>
+</html>
