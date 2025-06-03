@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>지진 데이터 시각화 (검색 버튼 수정)</title>
+  <title>지진 데이터 시각화 (통합 검색)</title>
 
   <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
   <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
@@ -48,8 +48,6 @@
       <div>
         <label for="searchTerm">위치 검색</label>
         <input type="text" id="searchTerm" placeholder="예: 일본" />
-        <button id="searchButton">검색</button>
-        <button id="clearButton">초기화</button>
       </div>
       <div>
         <label for="minMag">최소 규모</label>
@@ -69,6 +67,10 @@
         <label for="endDate">종료 날짜</label>
         <input type="date" id="endDate" />
       </div>
+      <div>
+        <button id="searchButton">검색</button>
+        <button id="clearButton">초기화</button>
+      </div>
     </div>
   </div>
 
@@ -78,14 +80,14 @@
       "width": 900, "height": 550, "padding": 5, "background": "steelblue",
 
       "signals": [
-        // ✨ searchTerm 시그널을 외부에서 제어하도록 'on' 속성 제거
+        // ✨ 모든 필터링 시그널을 외부 제어 방식으로 통일
         { "name": "searchTerm", "value": "" },
+        { "name": "minMag", "value": 0 },
+        { "name": "maxMag", "value": 10 },
+        { "name": "startDate", "value": "" },
+        { "name": "endDate", "value": "" },
 
-        // --- 나머지 시그널은 그대로 유지 ---
-        {"name": "minMag", "value": 0, "bind": {"input": "range", "element": "#minMag", "min": 0, "max": 10, "step": 0.1}},
-        {"name": "maxMag", "value": 10, "bind": {"input": "range", "element": "#maxMag", "min": 0, "max": 10, "step": 0.1}},
-        {"name": "startDate", "value": "", "on": [{"events": "input#startDate", "update": "event.target.value"}]},
-        {"name": "endDate", "value": "", "on": [{"events": "input#endDate", "update": "event.target.value"}]},
+        // --- 지도 이동/확대 시그널은 그대로 유지 ---
         {
           "name": "centerPoint", "value": [0, 0],
           "on": [{
@@ -125,36 +127,65 @@
     ];
 
     vegaEmbed('#vis', spec, { actions: false }).then(({ view }) => {
-      // 슬라이더 값 표시를 위한 이벤트 리스너
+      // --- 모든 HTML 컨트롤 요소 가져오기 ---
+      const searchInputEl = document.getElementById('searchTerm');
       const minMagEl = document.getElementById('minMag');
       const maxMagEl = document.getElementById('maxMag');
+      const startDateEl = document.getElementById('startDate');
+      const endDateEl = document.getElementById('endDate');
+      
       const minValSpan = document.getElementById('minMagValue');
       const maxValSpan = document.getElementById('maxMagValue');
+
+      const searchButtonEl = document.getElementById('searchButton');
+      const clearButtonEl = document.getElementById('clearButton');
+      
+      // 슬라이더 값을 옆의 숫자에 실시간으로 표시하는 리스너는 그대로 유지
       minMagEl.addEventListener('input', () => minValSpan.textContent = minMagEl.value);
       maxMagEl.addEventListener('input', () => maxValSpan.textContent = maxMagEl.value);
 
-      // ✨ 자바스크립트로 검색 관련 이벤트 리스너를 직접 제어
-      const searchInputEl = document.getElementById('searchTerm');
-      const searchButtonEl = document.getElementById('searchButton');
-      const clearButtonEl = document.getElementById('clearButton');
 
-      // '검색' 버튼 클릭 시
-      searchButtonEl.addEventListener('click', () => {
-        view.signal('searchTerm', searchInputEl.value).run();
-      });
+      // ✨ 검색 실행 함수
+      function runSearch() {
+        view.signal('searchTerm', searchInputEl.value)
+            .signal('minMag', parseFloat(minMagEl.value))
+            .signal('maxMag', parseFloat(maxMagEl.value))
+            .signal('startDate', startDateEl.value)
+            .signal('endDate', endDateEl.value)
+            .run();
+      }
 
-      // 입력창에서 'Enter' 키를 눌렀을 시
+      // ✨ '검색' 버튼 클릭 시 모든 필터 값으로 검색 실행
+      searchButtonEl.addEventListener('click', runSearch);
+
+      // ✨ 입력창에서 'Enter' 키를 눌렀을 때도 검색 실행
       searchInputEl.addEventListener('keypress', (event) => {
         if (event.key === 'Enter') {
-          event.preventDefault(); // 불필요한 동작 방지
-          view.signal('searchTerm', searchInputEl.value).run();
+          event.preventDefault();
+          runSearch();
         }
       });
       
-      // '초기화' 버튼 클릭 시
+      // ✨ '초기화' 버튼 클릭 시 모든 컨트롤과 시그널을 기본값으로 리셋
       clearButtonEl.addEventListener('click', () => {
-        searchInputEl.value = ''; // HTML 입력창의 텍스트를 비움
-        view.signal('searchTerm', '').run(); // Vega의 필터링을 초기화
+        // HTML 컨트롤 값 초기화
+        searchInputEl.value = '';
+        minMagEl.value = 0;
+        maxMagEl.value = 10;
+        startDateEl.value = '';
+        endDateEl.value = '';
+        
+        // 슬라이더 옆 숫자 표시 초기화
+        minValSpan.textContent = '0';
+        maxValSpan.textContent = '10';
+
+        // Vega 시그널 초기화 후 필터링 실행
+        view.signal('searchTerm', '')
+            .signal('minMag', 0)
+            .signal('maxMag', 10)
+            .signal('startDate', '')
+            .signal('endDate', '')
+            .run();
       });
     });
   </script>
