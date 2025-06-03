@@ -2,55 +2,65 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>지진 데이터 시각화 (가운데 정렬)</title>
+  <title>지진 데이터 시각화</title>
 
   <!-- Vega 라이브러리 -->
   <script src="https://cdn.jsdelivr.net/npm/vega@6"></script>
   <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
 
   <style>
-    /* 1) 브라우저 화면 전체를 Flex 컨테이너로 설정 */
+    /* (1) body 전체를 Flex 컨테이너로 만들고, 
+          화면 세로 중앙 정렬은 필요 없다면 justify-content를 지워도 됩니다. */
     html, body {
       margin: 0;
       padding: 0;
-      height: 100vh;          /* 뷰포트 전체 높이를 100%로 */
-      display: flex;
-      flex-direction: column; /* 위에서 아래로 쌓기 */
-      align-items: center;    /* 가로 축(수평) 가운데 정렬 */
-      justify-content: center; /* 세로 축에서도 가운데 정렬(필요 시) */
       background-color: #eef2f5;
-    }
-
-    /* 2) Vega 차트(#vis)를 감싸는 컨테이너에 고정 너비와 자동 여백 지정 */
-    #vis {
-      width: 900px;
-      height: 550px;
-      margin: 0 auto;      /* 좌우 자동 여백 → 수평 중앙 정렬 */
-      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-      background: white;   /* 약간의 테두리 대비를 위해 배경색 지정 */
-    }
-
-    /* 3) 입력 컨트롤(controls) 전체를 가로 너비 900px로 맞추고, 중앙 정렬 */
-    .controls {
-      width: 900px;
-      margin: 20px auto;   /* 위아래 20px, 좌우 중앙 정렬 */
       display: flex;
-      flex-wrap: wrap;     /* 줄 바꿈 허용 */
-      gap: 12px;           /* 아이템 간 간격 */
+      flex-direction: column;
+      align-items: center;      /* 가로 방향 중앙 정렬 */
+      /* justify-content: center; */ /* 세로 방향 중앙 정렬이 필요하다면 주석 해제 */
+    }
+
+    /* (2) 지도와 컨트롤 박스를 묶는 래퍼(wrapper) */
+    .wrapper {
+      width: 900px;            /* 지도의 width와 동일하게 맞춤 */
+      margin: 20px auto;       /* 화면 상하 여백 20px, 좌우 자동 마진(가운데 배치) */
+      display: flex;
+      flex-direction: column;  /* 위에 높이가 있는 지도, 아래에 컨트롤 박스 */
+      align-items: stretch;    /* 자식 요소(#vis, .controls)가 너비 100%로 늘어나도록 */
+      gap: 0;                  /* 필요 시 하단 여백을 조정하되, 여기서는 0 */
+    }
+
+    /* (3) Vega 시각화 영역(#vis) */
+    #vis {
+      width: 100%;            /* 래퍼 너비(900px)에 맞춰 100% */
+      height: 550px;          /* 지도 높이 고정 */
+      background: white;      /* 약간의 흰색 배경 */
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+
+    /* (4) 컨트롤 박스(.controls) 스타일 */
+    .controls {
+      width: 100%;            /* 래퍼 너비(900px)에 딱 맞춤 */
       background: white;
-      padding: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding: 12px 16px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
       border-radius: 4px;
+      margin-top: 16px;       /* 지도와 컨트롤 사이 약간의 여백 */
     }
 
-    .controls > * {
-      flex-shrink: 0;      /* 내용 크기가 지정한 만큼 유지 */
+    .controls > div {
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
 
     .controls label {
       font-size: 14px;
-      margin-right: 6px;
-      white-space: nowrap; /* 레이블이 줄 바뀌지 않도록 */
+      white-space: nowrap;
     }
 
     .controls input[type="text"] {
@@ -65,225 +75,16 @@
 
     .controls input[type="date"] {
       padding: 4px;
+      font-size: 14px;
+    }
+
+    .controls span {
+      font-size: 14px;
+      min-width: 24px;
+      text-align: center;
     }
   </style>
 </head>
 
 <body>
-  <!-- Vega 차트를 렌더링할 영역 -->
-  <div id="vis"></div>
-
-  <!-- 검색창, 슬라이더, 날짜 입력 등을 모아놓은 컨트롤 박스 -->
-  <div class="controls">
-    <div>
-      <label for="searchTerm">위치 검색</label>
-      <input type="text" id="searchTerm" placeholder="예: 일본" />
-    </div>
-
-    <div>
-      <label for="minMag">최소 규모</label>
-      <input type="range" id="minMag" min="0" max="10" step="0.1" value="0" />
-      <span id="minMagValue">0</span>
-    </div>
-
-    <div>
-      <label for="maxMag">최대 규모</label>
-      <input type="range" id="maxMag" min="0" max="10" step="0.1" value="10" />
-      <span id="maxMagValue">10</span>
-    </div>
-
-    <div>
-      <label for="startDate">시작 날짜</label>
-      <input type="date" id="startDate" />
-    </div>
-
-    <div>
-      <label for="endDate">종료 날짜</label>
-      <input type="date" id="endDate" />
-    </div>
-  </div>
-
-  <script>
-    // 1) Vega 스펙 정의
-    const spec = {
-      "$schema": "https://vega.github.io/schema/vega/v6.json",
-      "width": 900,
-      "height": 550,
-      "padding": 5,
-      "background": "steelblue",
-      "signals": [
-        {
-          "name": "searchTerm",
-          "value": "",
-          "on": [
-            {
-              "events": { "source": "view", "type": "signal", "signal": "searchTerm" },
-              "update": "searchTerm"
-            }
-          ]
-        },
-        {
-          "name": "minMag",
-          "value": 0,
-          "on": [
-            {
-              "events": { "source": "view", "type": "signal", "signal": "minMag" },
-              "update": "minMag"
-            }
-          ]
-        },
-        {
-          "name": "maxMag",
-          "value": 10,
-          "on": [
-            {
-              "events": { "source": "view", "type": "signal", "signal": "maxMag" },
-              "update": "maxMag"
-            }
-          ]
-        },
-        {
-          "name": "startDate",
-          "value": "",
-          "on": [
-            {
-              "events": { "source": "view", "type": "signal", "signal": "startDate" },
-              "update": "startDate"
-            }
-          ]
-        },
-        {
-          "name": "endDate",
-          "value": "",
-          "on": [
-            {
-              "events": { "source": "view", "type": "signal", "signal": "endDate" },
-              "update": "endDate"
-            }
-          ]
-        }
-      ],
-      "projections": [
-        {
-          "name": "world_projection",
-          "type": "equalEarth",
-          "scale": 180,
-          "translate": [
-            { "signal": "width / 2" },
-            { "signal": "height / 2" }
-          ]
-        }
-      ],
-      "data": [
-        {
-          "name": "world",
-          "url": "https://vega.github.io/vega/data/world-110m.json",
-          "format": { "type": "topojson", "feature": "countries" }
-        },
-        {
-          "name": "earthquakes",
-          "url": "https://raw.githubusercontent.com/Rhamee/Information-Visualization-Final/main/earthquake_data.json",
-          "format": { "type": "json" },
-          "transform": [
-            {
-              "type": "filter",
-              "expr":
-                "(searchTerm == '' || indexof(lower(datum.location), lower(searchTerm)) >= 0)" +
-                " && (datum.magnitude >= minMag && datum.magnitude <= maxMag)" +
-                " && (startDate == '' || datum.date >= startDate)" +
-                " && (endDate == '' || datum.date <= endDate)"
-            },
-            {
-              "type": "geopoint",
-              "projection": "world_projection",
-              "fields": ["longitude", "latitude"],
-              "as": ["x", "y"]
-            },
-            {
-              "type": "formula",
-              "expr": "pow(datum.magnitude, 3.5)",
-              "as": "area"
-            }
-          ]
-        }
-      ],
-      "marks": [
-        {
-          "type": "shape",
-          "from": { "data": "world" },
-          "encode": {
-            "enter": {
-              "fill": { "value": "seagreen" },
-              "stroke": { "value": "#666" }
-            }
-          },
-          "transform": [
-            {
-              "type": "geoshape",
-              "projection": "world_projection"
-            }
-          ]
-        },
-        {
-          "type": "symbol",
-          "from": { "data": "earthquakes" },
-          "encode": {
-            "enter": {
-              "x": { "field": "x" },
-              "y": { "field": "y" },
-              "size": { "field": "area" },
-              "fill": { "value": "orange" },
-              "stroke": { "value": "orange" },
-              "strokeWidth": { "value": 1 },
-              "opacity": { "value": 0.6 },
-              "tooltip": {
-                "signal":
-                  "'📍 ' + datum.location + '\\n규모: ' + datum.magnitude + ' / ' + datum.date"
-              }
-            }
-          }
-        }
-      ]
-    };
-
-    // 2) Vega-Embed (actions: false로 “export” 버튼 등을 숨김)
-    vegaEmbed('#vis', spec, { actions: false }).then(({ view }) => {
-      // 3) HTML 컨트롤을 Vega 시그널에 연결
-      const searchEl   = document.getElementById('searchTerm');
-      const minMagEl   = document.getElementById('minMag');
-      const maxMagEl   = document.getElementById('maxMag');
-      const startDateEl= document.getElementById('startDate');
-      const endDateEl  = document.getElementById('endDate');
-      const minValSpan = document.getElementById('minMagValue');
-      const maxValSpan = document.getElementById('maxMagValue');
-
-      // 위치 검색 (텍스트 입력)
-      searchEl.addEventListener('input', () => {
-        view.signal('searchTerm', searchEl.value).runAsync();
-      });
-
-      // 최소 규모 슬라이더
-      minMagEl.addEventListener('input', () => {
-        minValSpan.textContent = minMagEl.value;
-        view.signal('minMag', +minMagEl.value).runAsync();
-      });
-
-      // 최대 규모 슬라이더
-      maxMagEl.addEventListener('input', () => {
-        maxValSpan.textContent = maxMagEl.value;
-        view.signal('maxMag', +maxMagEl.value).runAsync();
-      });
-
-      // 시작 날짜 입력
-      startDateEl.addEventListener('input', () => {
-        view.signal('startDate', startDateEl.value).runAsync();
-      });
-
-      // 종료 날짜 입력
-      endDateEl.addEventListener('input', () => {
-        view.signal('endDate', endDateEl.value).runAsync();
-      });
-    });
-  </script>
-</body>
-</html>
+  <!-- (2) 래퍼(wrapper
