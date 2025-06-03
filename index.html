@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>지진 데이터 시각화</title>
+  <title>지진 데이터 시각화 (가로 정렬된 지도 + 컨트롤)</title>
 
   <!-- Vega 라이브러리 -->
   <script src="https://cdn.jsdelivr.net/npm/vega@6"></script>
@@ -87,4 +87,217 @@
 </head>
 
 <body>
-  <!-- (2) 래퍼(wrapper
+  <!-- (2) 래퍼(wrapper)를 만들어 지도와 컨트롤을 함께 감쌉니다. -->
+  <div class="wrapper">
+    <!-- (3) Vega가 렌더링할 지도 공간 -->
+    <div id="vis"></div>
+
+    <!-- (4) 검색창, 슬라이더, 날짜 입력 등을 담은 컨트롤 박스 -->
+    <div class="controls">
+      <div>
+        <label for="searchTerm">위치 검색</label>
+        <input type="text" id="searchTerm" placeholder="예: 일본" />
+      </div>
+      <div>
+        <label for="minMag">최소 규모</label>
+        <input type="range" id="minMag" min="0" max="10" step="0.1" value="0" />
+        <span id="minMagValue">0</span>
+      </div>
+      <div>
+        <label for="maxMag">최대 규모</label>
+        <input type="range" id="maxMag" min="0" max="10" step="0.1" value="10" />
+        <span id="maxMagValue">10</span>
+      </div>
+      <div>
+        <label for="startDate">시작 날짜</label>
+        <input type="date" id="startDate" />
+      </div>
+      <div>
+        <label for="endDate">종료 날짜</label>
+        <input type="date" id="endDate" />
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Vega 사양(spec)
+    const spec = {
+      "$schema": "https://vega.github.io/schema/vega/v6.json",
+      "width": 900,
+      "height": 550,
+      "padding": 5,
+      "background": "steelblue",
+
+      "signals": [
+        {
+          "name": "searchTerm",
+          "value": "",
+          "on": [
+            {
+              "events": { "source": "view", "type": "signal", "signal": "searchTerm" },
+              "update": "searchTerm"
+            }
+          ]
+        },
+        {
+          "name": "minMag",
+          "value": 0,
+          "on": [
+            {
+              "events": { "source": "view", "type": "signal", "signal": "minMag" },
+              "update": "minMag"
+            }
+          ]
+        },
+        {
+          "name": "maxMag",
+          "value": 10,
+          "on": [
+            {
+              "events": { "source": "view", "type": "signal", "signal": "maxMag" },
+              "update": "maxMag"
+            }
+          ]
+        },
+        {
+          "name": "startDate",
+          "value": "",
+          "on": [
+            {
+              "events": { "source": "view", "type": "signal", "signal": "startDate" },
+              "update": "startDate"
+            }
+          ]
+        },
+        {
+          "name": "endDate",
+          "value": "",
+          "on": [
+            {
+              "events": { "source": "view", "type": "signal", "signal": "endDate" },
+              "update": "endDate"
+            }
+          ]
+        }
+      ],
+
+      "projections": [
+        {
+          "name": "world_projection",
+          "type": "equalEarth",
+          "scale": 180,
+          "translate": [
+            { "signal": "width / 2" },
+            { "signal": "height / 2" }
+          ]
+        }
+      ],
+
+      "data": [
+        {
+          "name": "world",
+          "url": "https://vega.github.io/vega/data/world-110m.json",
+          "format": { "type": "topojson", "feature": "countries" }
+        },
+        {
+          "name": "earthquakes",
+          "url": "https://raw.githubusercontent.com/Rhamee/Information-Visualization-Final/main/earthquake_data.json",
+          "format": { "type": "json" },
+          "transform": [
+            {
+              "type": "filter",
+              "expr":
+                "(searchTerm == '' || indexof(lower(datum.location), lower(searchTerm)) >= 0)" +
+                " && (datum.magnitude >= minMag && datum.magnitude <= maxMag)" +
+                " && (startDate == '' || datum.date >= startDate)" +
+                " && (endDate == '' || datum.date <= endDate)"
+            },
+            {
+              "type": "geopoint",
+              "projection": "world_projection",
+              "fields": ["longitude", "latitude"],
+              "as": ["x", "y"]
+            },
+            {
+              "type": "formula",
+              "expr": "pow(datum.magnitude, 3.5)",
+              "as": "area"
+            }
+          ]
+        }
+      ],
+
+      "marks": [
+        {
+          "type": "shape",
+          "from": { "data": "world" },
+          "encode": {
+            "enter": {
+              "fill": { "value": "seagreen" },
+              "stroke": { "value": "#666" }
+            }
+          },
+          "transform": [
+            {
+              "type": "geoshape",
+              "projection": "world_projection"
+            }
+          ]
+        },
+        {
+          "type": "symbol",
+          "from": { "data": "earthquakes" },
+          "encode": {
+            "enter": {
+              "x": { "field": "x" },
+              "y": { "field": "y" },
+              "size": { "field": "area" },
+              "fill": { "value": "orange" },
+              "stroke": { "value": "orange" },
+              "strokeWidth": { "value": 1 },
+              "opacity": { "value": 0.6 },
+              "tooltip": {
+                "signal": "'📍 ' + datum.location + '\\n규모: ' + datum.magnitude + ' / ' + datum.date"
+              }
+            }
+          }
+        }
+      ]
+    };
+
+    // Vega-Embed: #vis에 spec을 렌더링, actions 옵션을 꺼서 Vega 로고/다운로드 버튼을 숨깁니다.
+    vegaEmbed('#vis', spec, { actions: false }).then(({ view }) => {
+      // (a) HTML 컨트롤 → Vega 시그널 연결
+      const searchEl    = document.getElementById('searchTerm');
+      const minMagEl    = document.getElementById('minMag');
+      const maxMagEl    = document.getElementById('maxMag');
+      const startDateEl = document.getElementById('startDate');
+      const endDateEl   = document.getElementById('endDate');
+      const minValSpan  = document.getElementById('minMagValue');
+      const maxValSpan  = document.getElementById('maxMagValue');
+
+      searchEl.addEventListener('input', () => {
+        view.signal('searchTerm', searchEl.value).runAsync();
+      });
+
+      minMagEl.addEventListener('input', () => {
+        minValSpan.textContent = minMagEl.value;
+        view.signal('minMag', +minMagEl.value).runAsync();
+      });
+
+      maxMagEl.addEventListener('input', () => {
+        maxValSpan.textContent = maxMagEl.value;
+        view.signal('maxMag', +maxMagEl.value).runAsync();
+      });
+
+      startDateEl.addEventListener('input', () => {
+        view.signal('startDate', startDateEl.value).runAsync();
+      });
+
+      endDateEl.addEventListener('input', () => {
+        view.signal('endDate', endDateEl.value).runAsync();
+      });
+    });
+  </script>
+</body>
+</html>
