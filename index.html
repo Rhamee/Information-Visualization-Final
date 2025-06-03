@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>지진 데이터 시각화 (확대 기능 추가)</title>
+  <title>지진 데이터 시각화 (마우스 확대/이동)</title>
 
   <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
   <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
@@ -37,6 +37,10 @@
       height: 550px;          /* 지도 높이 고정 */
       background: white;      /* 약간의 흰색 배경 */
       box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      cursor: grab; /* 마우스 커서를 잡는 모양으로 변경 */
+    }
+    #vis:active {
+        cursor: grabbing; /* 드래그 중에는 주먹 쥔 모양으로 변경 */
     }
 
     /* (4) 컨트롤 박스(.controls) 스타일 */
@@ -93,7 +97,7 @@
     <div class="controls">
       <div>
         <label for="searchTerm">위치 검색</label>
-        <input type="text" id="searchTerm" placeholder="예: 일본 (입력 후 잠시 대기)" />
+        <input type="text" id="searchTerm" placeholder="예: 일본" />
       </div>
       <div>
         <label for="minMag">최소 규모</label>
@@ -126,67 +130,48 @@
       "background": "steelblue",
 
       "signals": [
-        // --- 기존 필터링 신호들 ---
-        {
-          "name": "searchTerm", "value": "",
+        // --- 데이터 필터링을 위한 신호 ---
+        { "name": "searchTerm", "value": "",
           "on": [{"events": "input#searchTerm", "update": "event.target.value"}]
         },
-        {
-          "name": "minMag", "value": 0,
-          "bind": {"input": "range", "element": "#minMag", "min": 0, "max": 10, "step": 0.1}
-        },
-        {
-          "name": "maxMag", "value": 10,
-          "bind": {"input": "range", "element": "#maxMag", "min": 0, "max": 10, "step": 0.1}
-        },
-        {
-          "name": "startDate", "value": "",
-          "on": [{"events": "input#startDate", "update": "event.target.value"}]
-        },
-        {
-          "name": "endDate", "value": "",
-          "on": [{"events": "input#endDate", "update": "event.target.value"}]
-        },
+        {"name": "minMag", "value": 0, "bind": {"input": "range", "element": "#minMag", "min": 0, "max": 10, "step": 0.1}},
+        {"name": "maxMag", "value": 10, "bind": {"input": "range", "element": "#maxMag", "min": 0, "max": 10, "step": 0.1}},
+        {"name": "startDate", "value": "", "on": [{"events": "input#startDate", "update": "event.target.value"}]},
+        {"name": "endDate", "value": "", "on": [{"events": "input#endDate", "update": "event.target.value"}]},
 
-        // --- ✨ 확대/이동을 위한 신호 추가 ---
+        // --- ✨ 마우스 드래그(PAN)를 위한 신호 ---
         {
-          "name": "centerPoint",
-          "value": [0, 0],
+          "name": "centerPoint", "value": [0, 0],
           "on": [{
-            "events": {"signal": "searchTerm"},
-            "update": "searchTerm ? (data('earthquakes')[0] ? [data('earthquakes')[0].longitude, data('earthquakes')[0].latitude] : [0,0]) : [0,0]"
+            "events": "[mousedown, window:mouseup] > window:mousemove!",
+            "update": "[drag_center[0] + (anchor_geo[0] - invert('world_projection', xy())[0]), drag_center[1] + (anchor_geo[1] - invert('world_projection', xy())[1])]"
           }]
         },
+        {"name": "anchor_geo", "value": [0, 0], "on": [{"events": "mousedown", "update": "invert('world_projection', xy())"}]},
+        {"name": "drag_center", "value": [0, 0], "on": [{"events": "mousedown", "update": "centerPoint"}]},
+
+        // --- ✨ 마우스 휠(ZOOM)을 위한 신호 ---
         {
-          "name": "scale",
-          "value": 180,
+          "name": "scale", "value": 180,
           "on": [{
-            "events": {"signal": "searchTerm"},
-            "update": "searchTerm ? 1000 : 180"
+            "events": "wheel!",
+            "update": "clamp(scale * pow(1.0005, -event.deltaY), 180, 8000)"
           }]
         }
       ],
 
-      // --- ✨ 프로젝션(투영법)에 신호를 연결하여 동적으로 변경 ---
       "projections": [
         {
           "name": "world_projection",
           "type": "equalEarth",
           "scale": {"signal": "scale"},
           "rotate": {"signal": "[-(centerPoint[0] || 0), -(centerPoint[1] || 0), 0]"},
-          "translate": [
-            {"signal": "width / 2"},
-            {"signal": "height / 2"}
-          ]
+          "translate": [{"signal": "width / 2"}, {"signal": "height / 2"}]
         }
       ],
 
       "data": [
-        {
-          "name": "world",
-          "url": "https://vega.github.io/vega/data/world-110m.json",
-          "format": { "type": "topojson", "feature": "countries" }
-        },
+        { "name": "world", "url": "https://vega.github.io/vega/data/world-110m.json", "format": { "type": "topojson", "feature": "countries" }},
         {
           "name": "earthquakes",
           "url": "https://raw.githubusercontent.com/Rhamee/Information-Visualization-Final/main/earthquake_data.json",
@@ -194,23 +179,10 @@
           "transform": [
             {
               "type": "filter",
-              "expr":
-                "(searchTerm == '' || indexof(lower(datum.location), lower(searchTerm)) >= 0)" +
-                " && (datum.magnitude >= minMag && datum.magnitude <= maxMag)" +
-                " && (startDate == '' || datum.date >= startDate)" +
-                " && (endDate == '' || datum.date <= endDate)"
+              "expr": "(searchTerm == '' || indexof(lower(datum.location), lower(searchTerm)) >= 0) && (datum.magnitude >= minMag && datum.magnitude <= maxMag) && (startDate == '' || datum.date >= startDate) && (endDate == '' || datum.date <= endDate)"
             },
-            {
-              "type": "geopoint",
-              "projection": "world_projection",
-              "fields": ["longitude", "latitude"],
-              "as": ["x", "y"]
-            },
-            {
-              "type": "formula",
-              "expr": "pow(datum.magnitude, 3.5)",
-              "as": "area"
-            }
+            { "type": "geopoint", "projection": "world_projection", "fields": ["longitude", "latitude"], "as": ["x", "y"] },
+            { "type": "formula", "expr": "pow(datum.magnitude, 3.5)", "as": "area" }
           ]
         }
       ],
@@ -219,15 +191,8 @@
         {
           "type": "shape",
           "from": { "data": "world" },
-          "encode": {
-            "enter": {
-              "fill": { "value": "seagreen" },
-              "stroke": { "value": "#666" }
-            }
-          },
-          "transform": [
-            { "type": "geoshape", "projection": "world_projection" }
-          ]
+          "encode": { "enter": { "fill": { "value": "seagreen" }, "stroke": { "value": "#666" } } },
+          "transform": [{ "type": "geoshape", "projection": "world_projection" }]
         },
         {
           "type": "symbol",
@@ -241,31 +206,23 @@
               "stroke": { "value": "orange" },
               "strokeWidth": { "value": 1 },
               "opacity": { "value": 0.6 },
-              "tooltip": {
-                "signal": "'📍 ' + datum.location + '\\n규모: ' + datum.magnitude + ' / ' + datum.date"
-              }
+              "tooltip": { "signal": "'📍 ' + datum.location + '\\n규모: ' + datum.magnitude + ' / ' + datum.date" }
             }
           }
         }
       ]
     };
 
-    // Vega-Embed: #vis에 spec을 렌더링, actions 옵션을 꺼서 Vega 로고/다운로드 버튼을 숨깁니다.
+    // Vega-Embed를 통해 #vis에 spec 렌더링
     vegaEmbed('#vis', spec, { actions: false }).then(({ view }) => {
-      // HTML 컨트롤 이벤트 리스너 (Vega의 'bind'로 대체되어 대부분 필요 없어짐)
-      // 슬라이더 값 표시를 위한 이벤트 리스너는 남겨둡니다.
+      // 슬라이더 값 표시를 위한 이벤트 리스너
       const minMagEl   = document.getElementById('minMag');
       const maxMagEl   = document.getElementById('maxMag');
       const minValSpan = document.getElementById('minMagValue');
       const maxValSpan = document.getElementById('maxMagValue');
-      const searchTermEl = document.getElementById('searchTerm');
-      const startDateEl = document.getElementById('startDate');
-      const endDateEl = document.getElementById('endDate');
 
       minMagEl.addEventListener('input', () => minValSpan.textContent = minMagEl.value);
       maxMagEl.addEventListener('input', () => maxValSpan.textContent = maxMagEl.value);
-      
-      // Vega Spec 외부에서 시그널을 직접 업데이트하는 로직은 'bind'와 'on'으로 대체되었으므로 제거합니다.
     });
   </script>
 </body>
