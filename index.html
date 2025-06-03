@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>지진 데이터 시각화 (규모별 색상 적용)</title>
+  <title>지진 데이터 시각화 (범례 분리)</title>
 
   <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
   <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
@@ -22,11 +22,32 @@
       box-shadow: 0 2px 8px rgba(0,0,0,0.2); cursor: grab;
     }
     #vis:active { cursor: grabbing; }
-    .controls {
-      width: 100%; background: white; display: flex; flex-wrap: wrap; gap: 12px;
-      padding: 12px 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      border-radius: 4px; margin-top: 16px;
+
+    /* ✨ 1. 하단 패널 레이아웃 스타일 추가 */
+    .bottom-panel {
+      display: flex;
+      gap: 16px; /* 컨트롤과 범례 사이의 간격 */
+      margin-top: 16px;
+      align-items: flex-start; /* 상단 정렬 */
     }
+
+    .controls {
+      flex-grow: 1; /* 컨트롤 영역이 남은 공간을 채우도록 함 */
+      background: white; display: flex; flex-wrap: wrap; gap: 12px;
+      padding: 12px 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      border-radius: 4px;
+      margin-top: 0; /* 부모인 bottom-panel에 마진이 있으므로 제거 */
+    }
+
+    /* ✨ 2. 범례 컨테이너 스타일 추가 */
+    #legend-container {
+      flex-shrink: 0; /* 범례 컨테이너가 줄어들지 않도록 함 */
+      padding: 12px 16px;
+      background: white;
+      border-radius: 4px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
     .controls > div { display: flex; align-items: center; gap: 6px; }
     .controls label { font-size: 14px; white-space: nowrap; }
     .controls input[type="text"] { width: 180px; padding: 4px 6px; font-size: 14px; }
@@ -44,83 +65,64 @@
 <body>
   <div class="wrapper">
     <div id="vis"></div>
-    <div class="controls">
-      <div>
-        <label for="searchTerm">위치 검색</label>
-        <input type="text" id="searchTerm" placeholder="예: 일본" />
+
+    <div class="bottom-panel">
+      <div class="controls">
+        <div>
+          <label for="searchTerm">위치 검색</label>
+          <input type="text" id="searchTerm" placeholder="예: 일본" />
+        </div>
+        <div>
+          <label for="minMag">최소 규모</label>
+          <input type="range" id="minMag" min="0" max="10" step="0.1" value="0" />
+          <span id="minMagValue">0</span>
+        </div>
+        <div>
+          <label for="maxMag">최대 규모</label>
+          <input type="range" id="maxMag" min="0" max="10" step="0.1" value="10" />
+          <span id="maxMagValue">10</span>
+        </div>
+        <div>
+          <label for="startDate">시작 날짜</label>
+          <input type="date" id="startDate" />
+        </div>
+        <div>
+          <label for="endDate">종료 날짜</label>
+          <input type="date" id="endDate" />
+        </div>
+        <div>
+          <button id="searchButton">검색</button>
+          <button id="clearButton">초기화</button>
+        </div>
       </div>
-      <div>
-        <label for="minMag">최소 규모</label>
-        <input type="range" id="minMag" min="0" max="10" step="0.1" value="0" />
-        <span id="minMagValue">0</span>
-      </div>
-      <div>
-        <label for="maxMag">최대 규모</label>
-        <input type="range" id="maxMag" min="0" max="10" step="0.1" value="10" />
-        <span id="maxMagValue">10</span>
-      </div>
-      <div>
-        <label for="startDate">시작 날짜</label>
-        <input type="date" id="startDate" />
-      </div>
-      <div>
-        <label for="endDate">종료 날짜</label>
-        <input type="date" id="endDate" />
-      </div>
-      <div>
-        <button id="searchButton">검색</button>
-        <button id="clearButton">초기화</button>
-      </div>
+
+      <div id="legend-container"></div>
     </div>
   </div>
 
   <script>
+    // --- 지도 시각화를 위한 메인 Spec ---
     const spec = {
       "$schema": "https://vega.github.io/schema/vega/v5.json",
       "width": 900, "height": 550, "padding": 5, "background": "steelblue",
-
       "signals": [
-        { "name": "searchTerm", "value": "" },
-        { "name": "minMag", "value": 0 },
-        { "name": "maxMag", "value": 10 },
-        { "name": "startDate", "value": "" },
+        { "name": "searchTerm", "value": "" }, { "name": "minMag", "value": 0 },
+        { "name": "maxMag", "value": 10 }, { "name": "startDate", "value": "" },
         { "name": "endDate", "value": "" },
-        {
-          "name": "centerPoint", "value": [0, 0],
-          "on": [{"events": "[mousedown, window:mouseup] > window:mousemove!", "update": "[drag_center[0] + (anchor_geo[0] - invert('world_projection', xy())[0]), drag_center[1] + (anchor_geo[1] - invert('world_projection', xy())[1])]"}]
-        },
+        {"name": "centerPoint", "value": [0, 0], "on": [{"events": "[mousedown, window:mouseup] > window:mousemove!", "update": "[drag_center[0] + (anchor_geo[0] - invert('world_projection', xy())[0]), drag_center[1] + (anchor_geo[1] - invert('world_projection', xy())[1])]"}]},
         {"name": "anchor_geo", "value": [0, 0], "on": [{"events": "mousedown", "update": "invert('world_projection', xy())"}]},
         {"name": "drag_center", "value": [0, 0], "on": [{"events": "mousedown", "update": "centerPoint"}]},
         {"name": "scale", "value": 180, "on": [{"events": "wheel!", "update": "clamp(scale * pow(1.0005, -event.deltaY), 180, 8000)"}]}
       ],
-      
       "projections": [
         {"name": "world_projection", "type": "equalEarth", "scale": {"signal": "scale"}, "rotate": {"signal": "[-(centerPoint[0] || 0), -(centerPoint[1] || 0), 0]"}, "translate": [{"signal": "width / 2"}, {"signal": "height / 2"}]}
       ],
-
-      // ✨ 1. 색상 스케일 정의
       "scales": [
-        {
-          "name": "color_scale", // 스케일 이름
-          "type": "linear",     // 숫자 -> 색상 변환에 적합한 'linear' 타입
-          "domain": [1, 5, 9],  // 규모 값의 범위 (낮음, 중간, 높음)
-          "range": ["yellow", "orange", "red"] // 위 규모에 매칭될 색상
-        }
+        {"name": "color_scale", "type": "linear", "domain": [1, 5, 9], "range": ["yellow", "orange", "red"]}
       ],
       
-      // ✨ 3. 범례 정의
-      "legends": [
-        {
-          "fill": "color_scale", // 위에서 정의한 색상 스케일을 사용
-          "title": "지진 규모",  // 범례 제목
-          "orient": "bottom-right", // 위치
-          "padding": 10,
-          "fillColor": "#f5f5f5",
-          "strokeColor": "#ccc",
-          "cornerRadius": 5
-        }
-      ],
-
+      // ✨ 3. 메인 Spec에서는 legends 속성 제거
+      
       "data": [
         {"name": "world", "url": "https://vega.github.io/vega/data/world-110m.json", "format": { "type": "topojson", "feature": "countries" }},
         {"name": "earthquakes", "url": "https://raw.githubusercontent.com/Rhamee/Information-Visualization-Final/main/earthquake_data.json", "format": { "type": "json" }, "transform": [
@@ -129,31 +131,34 @@
           {"type": "formula", "expr": "pow(datum.magnitude, 3.5)", "as": "area"}
         ]}
       ],
-      
       "marks": [
         {"type": "shape", "from": { "data": "world" }, "encode": { "enter": { "fill": { "value": "seagreen" }, "stroke": { "value": "#666" } } }, "transform": [{ "type": "geoshape", "projection": "world_projection" }]},
-        {
-          "type": "symbol", "from": { "data": "earthquakes" },
-          "encode": {
-            "enter": {
-              "size": { "field": "area" },
-              // ✨ 2. 색상을 스케일에 연결
-              "fill": { "scale": "color_scale", "field": "magnitude" },
-              "stroke": { "scale": "color_scale", "field": "magnitude" },
-              "strokeWidth": { "value": 1 }, 
-              "opacity": { "value": 0.7 },
-              "tooltip": { "signal": "'📍 ' + datum.location + '\\n규모: ' + datum.magnitude + ' / ' + datum.date" }
-            },
-            "update": {
-              "x": { "field": "x" }, 
-              "y": { "field": "y" }
-            }
-          }
-        }
+        {"type": "symbol", "from": { "data": "earthquakes" }, "encode": { "enter": { "size": { "field": "area" }, "fill": { "scale": "color_scale", "field": "magnitude" }, "stroke": { "scale": "color_scale", "field": "magnitude" }, "strokeWidth": { "value": 1 }, "opacity": { "value": 0.7 }, "tooltip": { "signal": "'📍 ' + datum.location + '\\n규모: ' + datum.magnitude + ' / ' + datum.date" }}, "update": { "x": { "field": "x" }, "y": { "field": "y" }}}}
       ]
     };
 
+    // ✨ 4. 범례만을 위한 별도의 Spec 정의
+    const legendSpec = {
+      "$schema": "https://vega.github.io/schema/vega/v5.json",
+      "width": 1, // 너비와 높이는 내용에 맞게 자동 조절되도록 작게 설정
+      "height": 1,
+      "padding": 0,
+      "autosize": "fit", // 내용에 맞게 크기 조절
+      "scales": [
+        // 메인 Spec의 스케일과 동일하게 정의
+        {"name": "color_scale", "type": "linear", "domain": [1, 5, 9], "range": ["yellow", "orange", "red"]}
+      ],
+      "legends": [
+        // 메인 Spec의 범례와 동일하게 정의
+        {"fill": "color_scale", "title": "지진 규모", "orient": "right", "encode": {"title": {"fontSize": {"value": 14}}, "labels": {"fontSize": {"value": 12}}}}
+      ]
+    };
+
+
+    // ✨ 5. vegaEmbed를 두 번 호출하여 지도와 범례를 각각 렌더링
+    // 지도 렌더링
     vegaEmbed('#vis', spec, { actions: false }).then(({ view }) => {
+      // ... 컨트롤러 로직은 그대로 유지 ...
       const searchInputEl = document.getElementById('searchTerm');
       const minMagEl = document.getElementById('minMag');
       const maxMagEl = document.getElementById('maxMag');
@@ -187,21 +192,17 @@
       
       clearButtonEl.addEventListener('click', () => {
         searchInputEl.value = '';
-        minMagEl.value = 0;
-        maxMagEl.value = 10;
-        startDateEl.value = '';
-        endDateEl.value = '';
-        minValSpan.textContent = '0';
-        maxValSpan.textContent = '10';
-
-        view.signal('searchTerm', '')
-            .signal('minMag', 0)
-            .signal('maxMag', 10)
-            .signal('startDate', '')
-            .signal('endDate', '')
-            .run();
+        minMagEl.value = 0; maxMagEl.value = 10;
+        startDateEl.value = ''; endDateEl.value = '';
+        minValSpan.textContent = '0'; maxValSpan.textContent = '10';
+        view.signal('searchTerm', '').signal('minMag', 0).signal('maxMag', 10)
+            .signal('startDate', '').signal('endDate', '').run();
       });
     });
+    
+    // 범례 렌더링
+    vegaEmbed('#legend-container', legendSpec, { actions: false });
+
   </script>
 </body>
 </html>
