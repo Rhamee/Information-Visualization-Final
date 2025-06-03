@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>지진 데이터 시각화 (마우스 확대/이동)</title>
+  <title>지진 데이터 시각화 (검색 버튼 추가)</title>
 
   <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
   <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
@@ -33,6 +33,18 @@
     .controls input[type="range"] { width: 150px; }
     .controls input[type="date"] { padding: 4px; font-size: 14px; }
     .controls span { font-size: 14px; min-width: 24px; text-align: center; }
+    /* ✨ 버튼 스타일 추가 */
+    .controls button {
+      padding: 4px 10px;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background-color: #f0f0f0;
+      cursor: pointer;
+    }
+    .controls button:hover {
+      background-color: #e0e0e0;
+    }
   </style>
 </head>
 
@@ -43,6 +55,7 @@
       <div>
         <label for="searchTerm">위치 검색</label>
         <input type="text" id="searchTerm" placeholder="예: 일본" />
+        <button id="searchButton">검색</button>
       </div>
       <div>
         <label for="minMag">최소 규모</label>
@@ -71,7 +84,20 @@
       "width": 900, "height": 550, "padding": 5, "background": "steelblue",
 
       "signals": [
-        { "name": "searchTerm", "value": "", "on": [{"events": "input#searchTerm", "update": "event.target.value"}] },
+        // ✨ 시그널 로직 변경
+        // 1. 사용자의 키보드 입력을 임시로 저장하는 신호
+        {
+          "name": "searchInput",
+          "value": "",
+          "on": [{"events": "input#searchTerm", "update": "event.target.value"}]
+        },
+        // 2. 필터링에 실제 사용되는 신호. '검색' 버튼을 눌렀을 때만 값이 변경됨.
+        {
+          "name": "searchTerm",
+          "value": "",
+          "on": [{"events": "click#searchButton", "update": "searchInput"}]
+        },
+
         {"name": "minMag", "value": 0, "bind": {"input": "range", "element": "#minMag", "min": 0, "max": 10, "step": 0.1}},
         {"name": "maxMag", "value": 10, "bind": {"input": "range", "element": "#maxMag", "min": 0, "max": 10, "step": 0.1}},
         {"name": "startDate", "value": "", "on": [{"events": "input#startDate", "update": "event.target.value"}]},
@@ -115,13 +141,12 @@
               "type": "filter",
               "expr": "(searchTerm == '' || indexof(lower(datum.location), lower(searchTerm)) >= 0) && (datum.magnitude >= minMag && datum.magnitude <= maxMag) && (startDate == '' || datum.date >= startDate) && (endDate == '' || datum.date <= endDate)"
             },
-            // ✨ geopoint를 다시 사용하되, signal 속성을 추가하여 동적으로 만듭니다.
             {
               "type": "geopoint",
               "projection": "world_projection",
               "fields": ["longitude", "latitude"],
               "as": ["x", "y"],
-              "signal": "centerPoint + scale" // Pan 또는 Zoom 시 이 transform을 다시 실행시키는 트리거
+              "signal": "centerPoint + scale"
             },
             { "type": "formula", "expr": "pow(datum.magnitude, 3.5)", "as": "area" }
           ]
@@ -138,19 +163,14 @@
         {
           "type": "symbol",
           "from": { "data": "earthquakes" },
-          // ✨ x, y 좌표를 update 세트에서 참조하도록 수정합니다.
           "encode": {
             "enter": {
-              "size": { "field": "area" },
-              "fill": { "value": "orange" },
-              "stroke": { "value": "orange" },
-              "strokeWidth": { "value": 1 },
-              "opacity": { "value": 0.6 },
+              "size": { "field": "area" }, "fill": { "value": "orange" }, "stroke": { "value": "orange" },
+              "strokeWidth": { "value": 1 }, "opacity": { "value": 0.6 },
               "tooltip": { "signal": "'📍 ' + datum.location + '\\n규모: ' + datum.magnitude + ' / ' + datum.date" }
             },
             "update": {
-              "x": { "field": "x" },
-              "y": { "field": "y" }
+              "x": { "field": "x" }, "y": { "field": "y" }
             }
           }
         }
