@@ -2,52 +2,30 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>지진 데이터 시각화 (최소 범위 수정)</title>
+  <title>지진 데이터 시각화 (깊이 정보 추가)</title>
 
   <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
   <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
   <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
 
   <style>
-    html, body {
-      margin: 0; padding: 0; background-color: #eef2f5; display: flex;
-      flex-direction: column; align-items: center;
-    }
-    .wrapper {
-      width: 900px; margin: 20px auto; display: flex; flex-direction: column;
-      align-items: stretch; gap: 16px;
-    }
-    .main-panel {
-      display: flex; gap: 16px; align-items: center;
-    }
-    #vis {
-      height: 550px; background: white;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.2); cursor: grab;
-    }
+    html, body { margin: 0; padding: 0; background-color: #eef2f5; display: flex; flex-direction: column; align-items: center; }
+    .wrapper { width: 900px; margin: 20px auto; display: flex; flex-direction: column; align-items: stretch; gap: 16px; }
+    .main-panel { display: flex; gap: 16px; align-items: center; }
+    #vis { height: 550px; background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.2); cursor: grab; }
     #vis:active { cursor: grabbing; }
-    #legend-container {
-      flex-shrink: 0; padding: 12px 16px; background: white;
-      border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    }
-    .controls {
-      width: 100%; background: white; display: flex; flex-wrap: wrap; gap: 12px;
-      padding: 12px 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      border-radius: 4px;
-    }
+    #legend-container { flex-shrink: 0; padding: 12px 16px; background: white; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .controls { width: 100%; background: white; display: flex; flex-wrap: wrap; gap: 12px; padding: 12px 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-radius: 4px; }
     .controls > div { display: flex; align-items: center; gap: 6px; }
     .controls label { font-size: 14px; white-space: nowrap; }
     .controls input[type="text"] { width: 180px; padding: 4px 6px; font-size: 14px; }
     .controls input[type="range"] { width: 150px; }
     .controls input[type="date"] { padding: 4px; font-size: 14px; }
     .controls span { font-size: 14px; min-width: 24px; text-align: center; }
-    .controls button {
-      padding: 4px 10px; font-size: 14px; border: 1px solid #ccc;
-      border-radius: 4px; background-color: #f0f0f0; cursor: pointer;
-    }
+    .controls button { padding: 4px 10px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; background-color: #f0f0f0; cursor: pointer; }
     .controls button:hover { background-color: #e0e0e0; }
   </style>
 </head>
-
 <body>
   <div class="wrapper">
     <div class="main-panel">
@@ -57,11 +35,7 @@
 
     <div class="controls">
       <div><label for="searchTerm">위치 검색</label><input type="text" id="searchTerm" placeholder="예: 일본" /></div>
-      <div>
-        <label for="minMag">최소 규모</label>
-        <input type="range" id="minMag" min="4" max="10" step="0.1" value="4" />
-        <span id="minMagValue">4</span>
-      </div>
+      <div><label for="minMag">최소 규모</label><input type="range" id="minMag" min="4" max="10" step="0.1" value="4" /><span id="minMagValue">4</span></div>
       <div><label for="maxMag">최대 규모</label><input type="range" id="maxMag" min="0" max="10" step="0.1" value="10" /><span id="maxMagValue">10</span></div>
       <div><label for="startDate">시작 날짜</label><input type="date" id="startDate" /></div>
       <div><label for="endDate">종료 날짜</label><input type="date" id="endDate" /></div>
@@ -70,27 +44,20 @@
   </div>
 
   <script>
-    // --- 지도 시각화를 위한 메인 Spec ---
     const spec = {
       "$schema": "https://vega.github.io/schema/vega/v5.json",
       "width": 720, "height": 550, "padding": 5, "background": "steelblue",
       "signals": [
-        {"name": "searchTerm", "value": ""}, 
-        { "name": "minMag", "value": 4 }, 
-        { "name": "maxMag", "value": 10 }, 
-        { "name": "startDate", "value": "" },
-        { "name": "endDate", "value": "" },
+        {"name": "searchTerm", "value": ""}, {"name": "minMag", "value": 4},
+        {"name": "maxMag", "value": 10}, {"name": "startDate", "value": ""},
+        {"name": "endDate", "value": ""},
         {"name": "centerPoint", "value": [0, 0], "on": [{"events": "[mousedown, window:mouseup] > window:mousemove!", "update": "[drag_center[0] + (anchor_geo[0] - invert('world_projection', xy())[0]), drag_center[1] + (anchor_geo[1] - invert('world_projection', xy())[1])]"}]},
         {"name": "anchor_geo", "value": [0, 0], "on": [{"events": "mousedown", "update": "invert('world_projection', xy())"}]},
         {"name": "drag_center", "value": [0, 0], "on": [{"events": "mousedown", "update": "centerPoint"}]},
         {"name": "scale", "value": 180, "on": [{"events": "wheel!", "update": "clamp(scale * pow(1.0005, -event.deltaY), 180, 8000)"}]}
       ],
-      "projections": [
-        {"name": "world_projection", "type": "equalEarth", "scale": {"signal": "scale"}, "rotate": {"signal": "[-(centerPoint[0] || 0), -(centerPoint[1] || 0), 0]"}, "translate": [{"signal": "width / 2"}, {"signal": "height / 2"}]}
-      ],
-      "scales": [
-        {"name": "color_scale", "type": "linear", "domain": [1, 5, 9], "range": ["yellow", "orange", "red"]}
-      ],
+      "projections": [{"name": "world_projection", "type": "equalEarth", "scale": {"signal": "scale"}, "rotate": {"signal": "[-(centerPoint[0] || 0), -(centerPoint[1] || 0), 0]"}, "translate": [{"signal": "width / 2"}, {"signal": "height / 2"}]}],
+      "scales": [{"name": "color_scale", "type": "linear", "domain": [1, 5, 9], "range": ["yellow", "orange", "red"]}],
       "data": [
         {"name": "world", "url": "https://vega.github.io/vega/data/world-110m.json", "format": {"type": "topojson", "feature": "countries"}},
         {"name": "earthquakes", "url": "https://raw.githubusercontent.com/Rhamee/Information-Visualization-Final/main/earthquake_data.json", "format": {"type": "json"}, "transform": [
@@ -101,18 +68,26 @@
       ],
       "marks": [
         {"type": "shape", "from": {"data": "world"}, "encode": {"enter": {"fill": {"value": "seagreen"}, "stroke": {"value": "#666"}}}, "transform": [{"type": "geoshape", "projection": "world_projection"}]},
-        {"type": "symbol", "from": {"data": "earthquakes"}, "encode": {"enter": {"size": {"field": "area"}, "fill": {"scale": "color_scale", "field": "magnitude"}, "stroke": {"scale": "color_scale", "field": "magnitude"}, "strokeWidth": {"value": 1}, "opacity": {"value": 0.7}, "tooltip": {"signal": "'📍 ' + datum.location + '\\n규모: ' + datum.magnitude + ' / ' + datum.date"}}, "update": {"x": {"field": "x"}, "y": {"field": "y"}}}}
+        {"type": "symbol", "from": {"data": "earthquakes"}, "encode": {
+            "enter": {
+              "size": {"field": "area"}, "fill": {"scale": "color_scale", "field": "magnitude"},
+              "stroke": {"scale": "color_scale", "field": "magnitude"}, "strokeWidth": {"value": 1},
+              "opacity": {"value": 0.7},
+              // ✨ 깊이 정보 추가 및 format 함수로 소수점 한 자리까지 표시
+              "tooltip": {"signal": "'📍 ' + datum.location + '\\n규모: ' + datum.magnitude + ' / ' + datum.date + '\\n깊이: ' + format(datum.depth, '.1f') + ' km'"}
+            },
+            "update": {"x": {"field": "x"}, "y": {"field": "y"}}
+          }
+        }
       ]
     };
 
-    // --- 범례만을 위한 별도의 Spec 정의 ---
     const legendSpec = {
       "$schema": "https://vega.github.io/schema/vega/v5.json", "padding": 5,
       "scales": [{"name": "color_scale", "type": "linear", "domain": [1, 5, 9], "range": ["yellow", "orange", "red"]}],
       "legends": [{"fill": "color_scale", "title": "지진 규모", "orient": "left", "encode": {"title": {"fontSize": {"value": 14}}, "labels": {"fontSize": {"value": 12}}}}]
     };
 
-    // 지도 렌더링
     vegaEmbed('#vis', spec, { actions: false }).then(({ view }) => {
       const searchInputEl = document.getElementById('searchTerm');
       const minMagEl = document.getElementById('minMag');
@@ -142,23 +117,14 @@
       });
       
       clearButtonEl.addEventListener('click', () => {
-        searchInputEl.value = '';
-        minMagEl.value = 4; 
-        maxMagEl.value = 10;
-        startDateEl.value = ''; 
-        endDateEl.value = '';
-        minValSpan.textContent = '4'; 
-        maxValSpan.textContent = '10';
-        view.signal('searchTerm', '')
-            .signal('minMag', 4)
-            .signal('maxMag', 10)
-            .signal('startDate', '')
-            .signal('endDate', '')
-            .run();
+        searchInputEl.value = ''; minMagEl.value = 4; maxMagEl.value = 10;
+        startDateEl.value = ''; endDateEl.value = '';
+        minValSpan.textContent = '4'; maxValSpan.textContent = '10';
+        view.signal('searchTerm', '').signal('minMag', 4).signal('maxMag', 10)
+            .signal('startDate', '').signal('endDate', '').run();
       });
     });
     
-    // 범례 렌더링
     vegaEmbed('#legend-container', legendSpec, { actions: false });
   </script>
 </body>
