@@ -67,8 +67,8 @@
 
     <div class="controls">
       <div><label for="searchTerm">위치 검색</label><input type="text" id="searchTerm" placeholder="예: Japan" /></div>
-      <div><label for="minMag">최소 규모</label><input type="range" id="minMag" min="0" max="10" step="0.1" value="0" /><span id="minMagValue">0</span></div>
-      <div><label for="maxMag">최대 규모</label><input type="range" id="maxMag" min="0" max="10" step="0.1" value="10" /><span id="maxMagValue">10</span></div>
+      <div><label for="minMag">최소 규모</label><input type="range" id="minMag" min="4" max="10" step="0.1" value="4" /><span id="minMagValue">4</span></div>
+      <div><label for="maxMag">최대 규모</label><input type="range" id="maxMag" min="4" max="10" step="0.1" value="10" /><span id="maxMagValue">10</span></div>
       <div><label for="startDate">시작 날짜</label><input type="date" id="startDate" /></div>
       <div><label for="endDate">종료 날짜</label><input type="date" id="endDate" /></div>
       <div><button id="searchButton">검색</button><button id="clearButton">초기화</button></div>
@@ -83,7 +83,7 @@
       "width": 720, 
       "height": 550, "padding": 5, "background": "steelblue",
       "signals": [
-        {"name": "searchTerm", "value": ""}, {"name": "minMag", "value": 0},
+        {"name": "searchTerm", "value": ""}, {"name": "minMag", "value": 4},
         {"name": "maxMag", "value": 10}, {"name": "startDate", "value": ""},
         {"name": "endDate", "value": ""},
         {"name": "centerPoint", "value": [0, 0], "on": [{"events": "[mousedown, window:mouseup] > window:mousemove!", "update": "[drag_center[0] + (anchor_geo[0] - invert('world_projection', xy())[0]), drag_center[1] + (anchor_geo[1] - invert('world_projection', xy())[1])]"}]},
