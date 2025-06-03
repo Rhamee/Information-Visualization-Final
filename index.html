@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>지진 데이터 시각화 (검색 버튼 추가)</title>
+  <title>지진 데이터 시각화 (검색 버튼 수정)</title>
 
   <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
   <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
@@ -33,18 +33,11 @@
     .controls input[type="range"] { width: 150px; }
     .controls input[type="date"] { padding: 4px; font-size: 14px; }
     .controls span { font-size: 14px; min-width: 24px; text-align: center; }
-    /* ✨ 버튼 스타일 추가 */
     .controls button {
-      padding: 4px 10px;
-      font-size: 14px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      background-color: #f0f0f0;
-      cursor: pointer;
+      padding: 4px 10px; font-size: 14px; border: 1px solid #ccc;
+      border-radius: 4px; background-color: #f0f0f0; cursor: pointer;
     }
-    .controls button:hover {
-      background-color: #e0e0e0;
-    }
+    .controls button:hover { background-color: #e0e0e0; }
   </style>
 </head>
 
@@ -56,6 +49,7 @@
         <label for="searchTerm">위치 검색</label>
         <input type="text" id="searchTerm" placeholder="예: 일본" />
         <button id="searchButton">검색</button>
+        <button id="clearButton">초기화</button>
       </div>
       <div>
         <label for="minMag">최소 규모</label>
@@ -84,20 +78,10 @@
       "width": 900, "height": 550, "padding": 5, "background": "steelblue",
 
       "signals": [
-        // ✨ 시그널 로직 변경
-        // 1. 사용자의 키보드 입력을 임시로 저장하는 신호
-        {
-          "name": "searchInput",
-          "value": "",
-          "on": [{"events": "input#searchTerm", "update": "event.target.value"}]
-        },
-        // 2. 필터링에 실제 사용되는 신호. '검색' 버튼을 눌렀을 때만 값이 변경됨.
-        {
-          "name": "searchTerm",
-          "value": "",
-          "on": [{"events": "click#searchButton", "update": "searchInput"}]
-        },
+        // ✨ searchTerm 시그널을 외부에서 제어하도록 'on' 속성 제거
+        { "name": "searchTerm", "value": "" },
 
+        // --- 나머지 시그널은 그대로 유지 ---
         {"name": "minMag", "value": 0, "bind": {"input": "range", "element": "#minMag", "min": 0, "max": 10, "step": 0.1}},
         {"name": "maxMag", "value": 10, "bind": {"input": "range", "element": "#maxMag", "min": 0, "max": 10, "step": 0.1}},
         {"name": "startDate", "value": "", "on": [{"events": "input#startDate", "update": "event.target.value"}]},
@@ -113,77 +97,65 @@
         {"name": "drag_center", "value": [0, 0], "on": [{"events": "mousedown", "update": "centerPoint"}]},
         {
           "name": "scale", "value": 180,
-          "on": [{
-            "events": "wheel!",
-            "update": "clamp(scale * pow(1.0005, -event.deltaY), 180, 8000)"
-          }]
+          "on": [{"events": "wheel!", "update": "clamp(scale * pow(1.0005, -event.deltaY), 180, 8000)"}]
         }
       ],
 
-      "projections": [
-        {
-          "name": "world_projection",
-          "type": "equalEarth",
-          "scale": {"signal": "scale"},
-          "rotate": {"signal": "[-(centerPoint[0] || 0), -(centerPoint[1] || 0), 0]"},
-          "translate": [{"signal": "width / 2"}, {"signal": "height / 2"}]
-        }
-      ],
-
-      "data": [
-        { "name": "world", "url": "https://vega.github.io/vega/data/world-110m.json", "format": { "type": "topojson", "feature": "countries" }},
-        {
-          "name": "earthquakes",
-          "url": "https://raw.githubusercontent.com/Rhamee/Information-Visualization-Final/main/earthquake_data.json",
-          "format": { "type": "json" },
-          "transform": [
-            {
-              "type": "filter",
-              "expr": "(searchTerm == '' || indexof(lower(datum.location), lower(searchTerm)) >= 0) && (datum.magnitude >= minMag && datum.magnitude <= maxMag) && (startDate == '' || datum.date >= startDate) && (endDate == '' || datum.date <= endDate)"
-            },
-            {
-              "type": "geopoint",
-              "projection": "world_projection",
-              "fields": ["longitude", "latitude"],
-              "as": ["x", "y"],
-              "signal": "centerPoint + scale"
-            },
-            { "type": "formula", "expr": "pow(datum.magnitude, 3.5)", "as": "area" }
-          ]
-        }
-      ],
-
-      "marks": [
-        {
-          "type": "shape",
-          "from": { "data": "world" },
-          "encode": { "enter": { "fill": { "value": "seagreen" }, "stroke": { "value": "#666" } } },
-          "transform": [{ "type": "geoshape", "projection": "world_projection" }]
-        },
-        {
-          "type": "symbol",
-          "from": { "data": "earthquakes" },
-          "encode": {
-            "enter": {
-              "size": { "field": "area" }, "fill": { "value": "orange" }, "stroke": { "value": "orange" },
-              "strokeWidth": { "value": 1 }, "opacity": { "value": 0.6 },
-              "tooltip": { "signal": "'📍 ' + datum.location + '\\n규모: ' + datum.magnitude + ' / ' + datum.date" }
-            },
-            "update": {
-              "x": { "field": "x" }, "y": { "field": "y" }
-            }
-          }
-        }
-      ]
+      // ... projections, data, marks는 이전과 동일 ...
+      "projections": [ /* 이전 코드와 동일 */ ],
+      "data": [ /* 이전 코드와 동일 */ ],
+      "marks": [ /* 이전 코드와 동일 */ ]
     };
+    
+    // projections, data, marks 부분은 길어서 생략했습니다. 아래 전체 코드에는 포함되어 있습니다.
+    spec.projections = [
+      {"name": "world_projection", "type": "equalEarth", "scale": {"signal": "scale"}, "rotate": {"signal": "[-(centerPoint[0] || 0), -(centerPoint[1] || 0), 0]"}, "translate": [{"signal": "width / 2"}, {"signal": "height / 2"}]}
+    ];
+    spec.data = [
+      {"name": "world", "url": "https://vega.github.io/vega/data/world-110m.json", "format": { "type": "topojson", "feature": "countries" }},
+      {"name": "earthquakes", "url": "https://raw.githubusercontent.com/Rhamee/Information-Visualization-Final/main/earthquake_data.json", "format": { "type": "json" }, "transform": [
+        {"type": "filter", "expr": "(searchTerm == '' || indexof(lower(datum.location), lower(searchTerm)) >= 0) && (datum.magnitude >= minMag && datum.magnitude <= maxMag) && (startDate == '' || datum.date >= startDate) && (endDate == '' || datum.date <= endDate)"},
+        {"type": "geopoint", "projection": "world_projection", "fields": ["longitude", "latitude"], "as": ["x", "y"], "signal": "centerPoint + scale"},
+        {"type": "formula", "expr": "pow(datum.magnitude, 3.5)", "as": "area"}
+      ]}
+    ];
+    spec.marks = [
+      {"type": "shape", "from": { "data": "world" }, "encode": { "enter": { "fill": { "value": "seagreen" }, "stroke": { "value": "#666" } } }, "transform": [{ "type": "geoshape", "projection": "world_projection" }]},
+      {"type": "symbol", "from": { "data": "earthquakes" }, "encode": { "enter": {"size": { "field": "area" }, "fill": { "value": "orange" }, "stroke": { "value": "orange" }, "strokeWidth": { "value": 1 }, "opacity": { "value": 0.6 }, "tooltip": { "signal": "'📍 ' + datum.location + '\\n규모: ' + datum.magnitude + ' / ' + datum.date" }}, "update": {"x": { "field": "x" }, "y": { "field": "y" }}}}
+    ];
 
     vegaEmbed('#vis', spec, { actions: false }).then(({ view }) => {
+      // 슬라이더 값 표시를 위한 이벤트 리스너
       const minMagEl = document.getElementById('minMag');
       const maxMagEl = document.getElementById('maxMag');
       const minValSpan = document.getElementById('minMagValue');
       const maxValSpan = document.getElementById('maxMagValue');
       minMagEl.addEventListener('input', () => minValSpan.textContent = minMagEl.value);
       maxMagEl.addEventListener('input', () => maxValSpan.textContent = maxMagEl.value);
+
+      // ✨ 자바스크립트로 검색 관련 이벤트 리스너를 직접 제어
+      const searchInputEl = document.getElementById('searchTerm');
+      const searchButtonEl = document.getElementById('searchButton');
+      const clearButtonEl = document.getElementById('clearButton');
+
+      // '검색' 버튼 클릭 시
+      searchButtonEl.addEventListener('click', () => {
+        view.signal('searchTerm', searchInputEl.value).run();
+      });
+
+      // 입력창에서 'Enter' 키를 눌렀을 시
+      searchInputEl.addEventListener('keypress', (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault(); // 불필요한 동작 방지
+          view.signal('searchTerm', searchInputEl.value).run();
+        }
+      });
+      
+      // '초기화' 버튼 클릭 시
+      clearButtonEl.addEventListener('click', () => {
+        searchInputEl.value = ''; // HTML 입력창의 텍스트를 비움
+        view.signal('searchTerm', '').run(); // Vega의 필터링을 초기화
+      });
     });
   </script>
 </body>
