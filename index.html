@@ -2,50 +2,53 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>지진 데이터 시각화</title>
+  <title>지진 지도 (지도+지진점 함께 줌/팬)</title>
 
-  <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
-  <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
+  <!-- Vega 및 Vega-Embed 불러오기 -->
+  <script src="https://cdn.jsdelivr.net/npm/vega@6"></script>
   <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
 
   <style>
-    /* (1) body 전체를 Flex 컨테이너로 만들고,
-         화면 세로 중앙 정렬은 필요 없다면 justify-content를 지워도 됩니다. */
+    /* =======================================================
+       1) 화면 전체를 Flex 컨테이너로 만들어 중앙 정렬
+       ======================================================= */
     html, body {
       margin: 0;
       padding: 0;
-      background-color: #eef2f5;
+      background: #eef2f5;
+      display: flex;
+      justify-content: center; /* 수평 중앙 정렬 */
+      align-items: center;     /* 수직 중앙 정렬 */
+      height: 100vh;           /* 화면 전체 높이 확보 */
+    }
+
+    /* =======================================================
+       2) 지도와 컨트롤을 묶는 래퍼
+       ======================================================= */
+    .wrapper {
+      width: 900px;           /* 지도 너비와 동일 */
+      margin: auto;
       display: flex;
       flex-direction: column;
-      align-items: center;     /* 가로 방향 중앙 정렬 */
-      /* justify-content: center; */ /* 세로 방향 중앙 정렬이 필요하다면 주석 해제 */
+      align-items: stretch;
+      gap: 16px;             /* 지도 아래 / 컨트롤 위 간격 */
     }
 
-    /* (2) 지도와 컨트롤 박스를 묶는 래퍼(wrapper) */
-    .wrapper {
-      width: 900px;         /* 지도의 width와 동일하게 맞춤 */
-      margin: 20px auto;      /* 화면 상하 여백 20px, 좌우 자동 마진(가운데 배치) */
-      display: flex;
-      flex-direction: column; /* 위에 높이가 있는 지도, 아래에 컨트롤 박스 */
-      align-items: stretch;   /* 자식 요소(#vis, .controls)가 너비 100%로 늘어나도록 */
-      gap: 0;                 /* 필요 시 하단 여백을 조정하되, 여기서는 0 */
-    }
-
-    /* (3) Vega 시각화 영역(#vis) */
+    /* =======================================================
+       3) Vega가 렌더링될 영역 (#vis)
+       ======================================================= */
     #vis {
-      width: 100%;            /* 래퍼 너비(900px)에 맞춰 100% */
-      height: 550px;          /* 지도 높이 고정 */
-      background: white;      /* 약간의 흰색 배경 */
+      width: 100%;           /* 래퍼 너비(900px)에 딱 맞춤 */
+      height: 550px;
+      background: white;
       box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-      cursor: grab; /* 마우스 커서를 잡는 모양으로 변경 */
-    }
-    #vis:active {
-        cursor: grabbing; /* 드래그 중에는 주먹 쥔 모양으로 변경 */
     }
 
-    /* (4) 컨트롤 박스(.controls) 스타일 */
+    /* =======================================================
+       4) 검색·필터 컨트롤 박스 (.controls)
+       ======================================================= */
     .controls {
-      width: 100%;            /* 래퍼 너비(900px)에 딱 맞춤 */
+      width: 100%;
       background: white;
       display: flex;
       flex-wrap: wrap;
@@ -53,35 +56,28 @@
       padding: 12px 16px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
       border-radius: 4px;
-      margin-top: 16px;       /* 지도와 컨트롤 사이 약간의 여백 */
     }
-
     .controls > div {
       display: flex;
       align-items: center;
       gap: 6px;
     }
-
     .controls label {
       font-size: 14px;
       white-space: nowrap;
     }
-
     .controls input[type="text"] {
       width: 180px;
       padding: 4px 6px;
       font-size: 14px;
     }
-
     .controls input[type="range"] {
       width: 150px;
     }
-
     .controls input[type="date"] {
       padding: 4px;
       font-size: 14px;
     }
-
     .controls span {
       font-size: 14px;
       min-width: 24px;
@@ -92,8 +88,10 @@
 
 <body>
   <div class="wrapper">
+    <!-- Vega 지도 렌더링 대상 -->
     <div id="vis"></div>
 
+    <!-- 검색/필터 컨트롤 박스 -->
     <div class="controls">
       <div>
         <label for="searchTerm">위치 검색</label>
@@ -121,112 +119,248 @@
   </div>
 
   <script>
-    // Vega 사양(spec)
+    // ============================================================
+    // Vega 스펙: “검색/필터(Signals) + 지도/지진점 함께 줌/팬(Signals)”
+    // ============================================================
     const spec = {
-      "$schema": "https://vega.github.io/schema/vega/v5.json",
+      "$schema": "https://vega.github.io/schema/vega/v6.json",
       "width": 900,
       "height": 550,
-      "padding": 5,
+      "padding": 0,
       "background": "steelblue",
 
       "signals": [
-        // --- 데이터 필터링을 위한 신호 ---
-        { "name": "searchTerm", "value": "", "on": [{"events": "input#searchTerm", "update": "event.target.value"}] },
-        {"name": "minMag", "value": 0, "bind": {"input": "range", "element": "#minMag", "min": 0, "max": 10, "step": 0.1}},
-        {"name": "maxMag", "value": 10, "bind": {"input": "range", "element": "#maxMag", "min": 0, "max": 10, "step": 0.1}},
-        {"name": "startDate", "value": "", "on": [{"events": "input#startDate", "update": "event.target.value"}]},
-        {"name": "endDate", "value": "", "on": [{"events": "input#endDate", "update": "event.target.value"}]},
-
-        // --- 마우스 드래그(PAN)를 위한 신호 ---
+        // --------------------
+        // [A] 검색/필터 시그널
+        // --------------------
         {
-          "name": "centerPoint", "value": [0, 0],
-          "on": [{
-            "events": "[mousedown, window:mouseup] > window:mousemove!",
-            "update": "[drag_center[0] + (anchor_geo[0] - invert('world_projection', xy())[0]), drag_center[1] + (anchor_geo[1] - invert('world_projection', xy())[1])]"
-          }]
+          "name": "searchTerm",
+          "value": "",
+          "on": [
+            {
+              "events": { "source": "view", "type": "signal", "signal": "searchTerm" },
+              "update": "searchTerm"
+            }
+          ]
         },
-        {"name": "anchor_geo", "value": [0, 0], "on": [{"events": "mousedown", "update": "invert('world_projection', xy())"}]},
-        {"name": "drag_center", "value": [0, 0], "on": [{"events": "mousedown", "update": "centerPoint"}]},
-
-        // --- 마우스 휠(ZOOM)을 위한 신호 ---
         {
-          "name": "scale", "value": 180,
-          "on": [{
-            "events": "wheel!",
-            "update": "clamp(scale * pow(1.0005, -event.deltaY), 180, 8000)"
-          }]
+          "name": "minMag",
+          "value": 0,
+          "on": [
+            {
+              "events": { "source": "view", "type": "signal", "signal": "minMag" },
+              "update": "minMag"
+            }
+          ]
+        },
+        {
+          "name": "maxMag",
+          "value": 10,
+          "on": [
+            {
+              "events": { "source": "view", "type": "signal", "signal": "maxMag" },
+              "update": "maxMag"
+            }
+          ]
+        },
+        {
+          "name": "startDate",
+          "value": "",
+          "on": [
+            {
+              "events": { "source": "view", "type": "signal", "signal": "startDate" },
+              "update": "startDate"
+            }
+          ]
+        },
+        {
+          "name": "endDate",
+          "value": "",
+          "on": [
+            {
+              "events": { "source": "view", "type": "signal", "signal": "endDate" },
+              "update": "endDate"
+            }
+          ]
+        },
+
+        // --------------------
+        // [B] 지도+지진점 줌/팬 전용 시그널
+        // --------------------
+        {
+          "name": "zoom",
+          "value": 180,
+          "on": [
+            {
+              "events": "window:wheel!",
+              "update": "clamp(zoom * pow(1.001, -event.deltaY), 50, 1200)"
+            }
+          ]
+        },
+        {
+          "name": "tx",
+          "value": 450,
+          "on": [
+            {
+              "events": "window:drag[!event.shiftKey]",
+              "update": "tx + event.dx"
+            }
+          ]
+        },
+        {
+          "name": "ty",
+          "value": 275,
+          "on": [
+            {
+              "events": "window:drag[!event.shiftKey]",
+              "update": "ty + event.dy"
+            }
+          ]
         }
       ],
 
+      // =======================================================
+      // 프로젝션: zoom, tx, ty 신호를 바인딩하여 동적 계산
+      // =======================================================
       "projections": [
         {
-          "name": "world_projection",
+          "name": "dynamic_proj",
           "type": "equalEarth",
-          "scale": {"signal": "scale"},
-          "rotate": {"signal": "[-(centerPoint[0] || 0), -(centerPoint[1] || 0), 0]"},
-          "translate": [{"signal": "width / 2"}, {"signal": "height / 2"}]
+          "scale": { "signal": "zoom" },
+          "translate": [
+            { "signal": "tx" },
+            { "signal": "ty" }
+          ]
         }
       ],
 
+      // =======================================================
+      // 데이터: 세계 지도 + 지진 정보
+      // =======================================================
       "data": [
-        { "name": "world", "url": "https://vega.github.io/vega/data/world-110m.json", "format": { "type": "topojson", "feature": "countries" }},
+        // 1) 세계 지도 (TopoJSON)
+        {
+          "name": "world",
+          "url": "https://vega.github.io/vega/data/world-110m.json",
+          "format": { "type": "topojson", "feature": "countries" }
+        },
+        // 2) 지진 데이터(JSON) → 필터 → geopoint(dynamic_proj) → 면적 계산
         {
           "name": "earthquakes",
           "url": "https://raw.githubusercontent.com/Rhamee/Information-Visualization-Final/main/earthquake_data.json",
           "format": { "type": "json" },
           "transform": [
+            // (A) 위치 검색/규모/날짜 필터
             {
               "type": "filter",
-              "expr": "(searchTerm == '' || indexof(lower(datum.location), lower(searchTerm)) >= 0) && (datum.magnitude >= minMag && datum.magnitude <= maxMag) && (startDate == '' || datum.date >= startDate) && (endDate == '' || datum.date <= endDate)"
+              "expr":
+                "(searchTerm == '' || indexof(lower(datum.location), lower(searchTerm)) >= 0)" +
+                " && (datum.magnitude >= minMag && datum.magnitude <= maxMag)" +
+                " && (startDate == '' || datum.date >= startDate)" +
+                " && (endDate == '' || datum.date <= endDate)"
             },
-            // ✨ geopoint 변환을 제거! 좌표는 마크에서 직접 계산합니다.
-            { "type": "formula", "expr": "pow(datum.magnitude, 3.5)", "as": "area" }
+            // (B) dynamic_proj 로 x, y 계산 → 줌/팬 시그널 반영되어 업데이트됨
+            {
+              "type": "geopoint",
+              "projection": "dynamic_proj",
+              "fields": ["longitude", "latitude"],
+              "as": ["x", "y"]
+            },
+            // (C) 규모 → 원 면적(area) 계산
+            {
+              "type": "formula",
+              "expr": "pow(datum.magnitude, 4) / 3",
+              "as": "area"
+            }
           ]
         }
       ],
 
+      // =======================================================
+      // 마크: (1) 세계 지도(shape) + (2) 지진점(symbol)
+      //       모두 dynamic_proj을 사용하여 줌/팬 반영
+      // =======================================================
       "marks": [
+        // (1) 세계 지도: dynamic_proj 적용
         {
           "type": "shape",
           "from": { "data": "world" },
-          "encode": { "enter": { "fill": { "value": "seagreen" }, "stroke": { "value": "#666" } } },
-          "transform": [{ "type": "geoshape", "projection": "world_projection" }]
+          "encode": {
+            "enter": {
+              "fill":   { "value": "seagreen" },
+              "stroke": { "value": "#666" }
+            }
+          },
+          "transform": [
+            { "type": "geoshape", "projection": "dynamic_proj" }
+          ]
         },
+        // (2) 지진점: dynamic_proj을 사용해 x, y가 매번 재계산됨
         {
           "type": "symbol",
           "from": { "data": "earthquakes" },
-          // ✨ encode를 enter와 update로 분리하여 동적/정적 속성을 관리합니다.
           "encode": {
             "enter": {
-              // 한 번만 계산하면 되는 정적 속성들
-              "size": { "field": "area" },
-              "fill": { "value": "orange" },
-              "stroke": { "value": "orange" },
+              "x":           { "field": "x" },          // dynamic_proj
+              "y":           { "field": "y" },          // dynamic_proj
+              "size":        { "field": "area" },
+              "fill":        { "value": "orange" },
+              "stroke":      { "value": "orange" },
               "strokeWidth": { "value": 1 },
-              "opacity": { "value": 0.6 },
-              "tooltip": { "signal": "'📍 ' + datum.location + '\\n규모: ' + datum.magnitude + ' / ' + datum.date" }
-            },
-            "update": {
-              // 지도가 움직일 때마다 다시 계산해야 하는 동적 속성들
-              "x": { "signal": "project('world_projection', datum)[0]" },
-              "y": { "signal": "project('world_projection', datum)[1]" }
+              "opacity":     { "value": 0.6 },
+              "tooltip": {
+                "signal":
+                  "'📍 ' + datum.location + '\\n규모: ' + datum.magnitude + ' / ' + datum.date"
+              }
             }
           }
         }
       ]
     };
 
-    // Vega-Embed를 통해 #vis에 spec 렌더링
+    // =======================================================
+    // Vega-Embed: #vis에 spec 렌더링 (actions: false로 버튼 숨김)
+    // =======================================================
     vegaEmbed('#vis', spec, { actions: false }).then(({ view }) => {
-      // 슬라이더 값 표시를 위한 이벤트 리스너
-      const minMagEl   = document.getElementById('minMag');
-      const maxMagEl   = document.getElementById('maxMag');
-      const minValSpan = document.getElementById('minMagValue');
-      const maxValSpan = document.getElementById('maxMagValue');
+      // -------------------------------
+      // (A) HTML 컨트롤 → Vega 시그널 연결
+      // -------------------------------
+      const searchEl    = document.getElementById('searchTerm');
+      const minMagEl    = document.getElementById('minMag');
+      const maxMagEl    = document.getElementById('maxMag');
+      const startDateEl = document.getElementById('startDate');
+      const endDateEl   = document.getElementById('endDate');
+      const minValSpan  = document.getElementById('minMagValue');
+      const maxValSpan  = document.getElementById('maxMagValue');
 
-      minMagEl.addEventListener('input', () => minValSpan.textContent = minMagEl.value);
-      maxMagEl.addEventListener('input', () => maxValSpan.textContent = maxMagEl.value);
-    });
+      // 위치 검색
+      searchEl.addEventListener('input', () => {
+        view.signal('searchTerm', searchEl.value).runAsync();
+      });
+      // 최소 규모
+      minMagEl.addEventListener('input', () => {
+        minValSpan.textContent = minMagEl.value;
+        view.signal('minMag', +minMagEl.value).runAsync();
+      });
+      // 최대 규모
+      maxMagEl.addEventListener('input', () => {
+        maxValSpan.textContent = maxMagEl.value;
+        view.signal('maxMag', +maxMagEl.value).runAsync();
+      });
+      // 시작 날짜
+      startDateEl.addEventListener('input', () => {
+        view.signal('startDate', startDateEl.value).runAsync();
+      });
+      // 종료 날짜
+      endDateEl.addEventListener('input', () => {
+        view.signal('endDate', endDateEl.value).runAsync();
+      });
+
+      // -------------------------------
+      // (B) 줌/팬은 Vega 내부에서 이미 window 이벤트로 binding했으므로
+      //      별도 추가 코드는 필요 없습니다.
+      // -------------------------------
+    }).catch(console.error);
   </script>
 </body>
 </html>
