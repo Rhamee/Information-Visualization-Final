@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>지진 데이터 시각화 (범례 수정)</title>
+  <title>지진 데이터 시각화 (레이아웃 수정)</title>
 
   <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
   <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
@@ -15,25 +15,35 @@
     }
     .wrapper {
       width: 900px; margin: 20px auto; display: flex; flex-direction: column;
-      align-items: stretch; gap: 0;
+      align-items: stretch; gap: 16px; /* ✨ 패널과 컨트롤 사이 간격 추가 */
     }
+
+    /* ✨ 1. 지도와 범례를 묶는 새로운 패널 스타일 */
+    .main-panel {
+      display: flex;
+      gap: 16px; /* 지도와 범례 사이 간격 */
+      align-items: center; /* 범례를 지도 중앙에 수직 정렬 */
+    }
+    
     #vis {
-      width: 100%; height: 550px; background: white;
+      /* 너비는 Vega Spec에서 직접 설정 */
+      height: 550px; background: white;
       box-shadow: 0 2px 8px rgba(0,0,0,0.2); cursor: grab;
     }
     #vis:active { cursor: grabbing; }
-    .bottom-panel {
-      display: flex; gap: 16px; margin-top: 16px; align-items: flex-start;
-    }
-    .controls {
-      flex-grow: 1; background: white; display: flex; flex-wrap: wrap; gap: 12px;
-      padding: 12px 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      border-radius: 4px; margin-top: 0;
-    }
+
     #legend-container {
       flex-shrink: 0; padding: 12px 16px; background: white;
       border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
+
+    .controls {
+      width: 100%; /* 이제 전체 너비를 차지 */
+      background: white; display: flex; flex-wrap: wrap; gap: 12px;
+      padding: 12px 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      border-radius: 4px;
+    }
+    
     .controls > div { display: flex; align-items: center; gap: 6px; }
     .controls label { font-size: 14px; white-space: nowrap; }
     .controls input[type="text"] { width: 180px; padding: 4px 6px; font-size: 14px; }
@@ -50,17 +60,18 @@
 
 <body>
   <div class="wrapper">
-    <div id="vis"></div>
-    <div class="bottom-panel">
-      <div class="controls">
-        <div><label for="searchTerm">위치 검색</label><input type="text" id="searchTerm" placeholder="예: 일본" /></div>
-        <div><label for="minMag">최소 규모</label><input type="range" id="minMag" min="0" max="10" step="0.1" value="0" /><span id="minMagValue">0</span></div>
-        <div><label for="maxMag">최대 규모</label><input type="range" id="maxMag" min="0" max="10" step="0.1" value="10" /><span id="maxMagValue">10</span></div>
-        <div><label for="startDate">시작 날짜</label><input type="date" id="startDate" /></div>
-        <div><label for="endDate">종료 날짜</label><input type="date" id="endDate" /></div>
-        <div><button id="searchButton">검색</button><button id="clearButton">초기화</button></div>
-      </div>
+    <div class="main-panel">
+      <div id="vis"></div>
       <div id="legend-container"></div>
+    </div>
+
+    <div class="controls">
+      <div><label for="searchTerm">위치 검색</label><input type="text" id="searchTerm" placeholder="예: 일본" /></div>
+      <div><label for="minMag">최소 규모</label><input type="range" id="minMag" min="0" max="10" step="0.1" value="0" /><span id="minMagValue">0</span></div>
+      <div><label for="maxMag">최대 규모</label><input type="range" id="maxMag" min="0" max="10" step="0.1" value="10" /><span id="maxMagValue">10</span></div>
+      <div><label for="startDate">시작 날짜</label><input type="date" id="startDate" /></div>
+      <div><label for="endDate">종료 날짜</label><input type="date" id="endDate" /></div>
+      <div><button id="searchButton">검색</button><button id="clearButton">초기화</button></div>
     </div>
   </div>
 
@@ -68,7 +79,9 @@
     // --- 지도 시각화를 위한 메인 Spec ---
     const spec = {
       "$schema": "https://vega.github.io/schema/vega/v5.json",
-      "width": 900, "height": 550, "padding": 5, "background": "steelblue",
+      // ✨ 3. 지도 너비 수정 (전체 900px - 범례공간 - 간격)
+      "width": 720, 
+      "height": 550, "padding": 5, "background": "steelblue",
       "signals": [
         {"name": "searchTerm", "value": ""}, {"name": "minMag", "value": 0},
         {"name": "maxMag", "value": 10}, {"name": "startDate", "value": ""},
@@ -99,7 +112,6 @@
     };
 
     // --- 범례만을 위한 별도의 Spec 정의 ---
-    // ✨ width, height, autosize 속성을 제거하여 Vega가 자동으로 크기를 잡도록 수정
     const legendSpec = {
       "$schema": "https://vega.github.io/schema/vega/v5.json",
       "padding": 5,
@@ -108,7 +120,9 @@
       ],
       "legends": [
         {
-          "fill": "color_scale", "title": "지진 규모", "orient": "right",
+          "fill": "color_scale", "title": "지진 규모", 
+          // ✨ 3. 범례 방향 수정
+          "orient": "left", 
           "encode": {
             "title": {"fontSize": {"value": 14}},
             "labels": {"fontSize": {"value": 12}}
